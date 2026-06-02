@@ -1421,6 +1421,13 @@ body {
     background: rgba(0, 0, 0, 0.1);
 }
 
+.log-filters {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
 .table-search {
     display: flex;
     align-items: center;
@@ -1429,7 +1436,8 @@ body {
     border: 1px solid var(--border-glass);
     padding: 6px 12px;
     border-radius: var(--radius-sm);
-    width: 220px;
+    width: auto;
+    min-width: 130px;
 }
 
 .table-search i {
@@ -1445,6 +1453,21 @@ body {
     font-family: var(--font-sans);
     font-size: 0.72rem;
     width: 100%;
+}
+
+.custom-select {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    width: 100%;
+    cursor: pointer;
+}
+.custom-select option {
+    background: #0e111a;
+    color: #fff;
 }
 
 .dashboard-table {

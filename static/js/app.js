@@ -66,6 +66,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Log table
         logSearch:      $("log-search"),
+        logTimeFilter:  $("log-time-filter"),
+        logConfFilter:  $("log-conf-filter"),
         logTbody:       $("event-log-tbody"),
     };
 
@@ -549,7 +551,21 @@ document.addEventListener("DOMContentLoaded", () => {
      ------------------------------------------------------- */
     function renderTable(logs) {
         const q  = (el.logSearch?.value || "").trim().toLowerCase();
-        const fl = logs.filter(l => l.label.includes(q));
+        const t  = el.logTimeFilter?.value || "all";
+        const c  = parseInt(el.logConfFilter?.value || "0", 10);
+        
+        const now = Date.now();
+        let timeLimit = 0;
+        if (t === "1h") timeLimit = now - 3600000;
+        else if (t === "24h") timeLimit = now - 86400000;
+        else if (t === "7d") timeLimit = now - 604800000;
+
+        const fl = logs.filter(l => {
+            if (!l.label.includes(q)) return false;
+            if (l.confidence * 100 < c) return false;
+            if (timeLimit > 0 && new Date(l.timestamp).getTime() < timeLimit) return false;
+            return true;
+        });
         if (!el.logTbody) return;
         el.logTbody.innerHTML = "";
 
@@ -1018,6 +1034,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Incident log table search query
     if (el.logSearch) {
         el.logSearch.addEventListener("input", () => renderTable(state.logs));
+    }
+    if (el.logTimeFilter) {
+        el.logTimeFilter.addEventListener("change", () => renderTable(state.logs));
+    }
+    if (el.logConfFilter) {
+        el.logConfFilter.addEventListener("change", () => renderTable(state.logs));
     }
 
     // System exports logs to CSV file

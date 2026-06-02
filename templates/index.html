@@ -391,9 +391,29 @@
     <div class="analytics-card log-card">
         <div class="card-header-row flex-between">
             <span class="card-title">// SYSTEM EVENT LOGGER</span>
-            <div class="table-search">
-                <i class="fa-solid fa-filter"></i>
-                <input type="text" id="log-search" placeholder="Filter logged class...">
+            <div class="log-filters">
+                <div class="table-search">
+                    <i class="fa-solid fa-filter"></i>
+                    <input type="text" id="log-search" placeholder="Class...">
+                </div>
+                <div class="table-search">
+                    <i class="fa-regular fa-clock"></i>
+                    <select id="log-time-filter" class="custom-select">
+                        <option value="all">All Time</option>
+                        <option value="1h">Last 1 Hour</option>
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                    </select>
+                </div>
+                <div class="table-search">
+                    <i class="fa-solid fa-percent"></i>
+                    <select id="log-conf-filter" class="custom-select">
+                        <option value="0">Any Conf.</option>
+                        <option value="50">&ge; 50% Conf.</option>
+                        <option value="75">&ge; 75% Conf.</option>
+                        <option value="90">&ge; 90% Conf.</option>
+                    </select>
+                </div>
             </div>
         </div>
         
