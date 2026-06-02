@@ -2,8 +2,10 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Path to persistent database within the workspace
-DB_PATH = "sensor_log.db"
+# On Vercel, the filesystem is read-only except for /tmp.
+# Locally, use the project directory.
+IS_VERCEL = os.environ.get("VERCEL", False)
+DB_PATH = "/tmp/sensor_log.db" if IS_VERCEL else "sensor_log.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # Create SQLite engine
