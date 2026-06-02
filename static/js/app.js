@@ -1,14 +1,14 @@
 /* ==========================================================================
-   CAMSPY ENGINE — v3 (Original HUD Layout)
-   Wires exactly to the rebuilt index.html DOM IDs.
+   CAMSPY ENGINE — v4 (Dynamic High-Scale Filter Architecture & Resq.io Style)
+   Wires to the rebuilt dashboard templates/index.html elements.
    TensorFlow.js COCO-SSD | Web Audio | FastAPI Backend
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
 
     /* -------------------------------------------------------
-       DOM NODES — every ID exists in the current index.html
-    ------------------------------------------------------- */
+       DOM NODES
+     ------------------------------------------------------- */
     const $  = id => document.getElementById(id);
     const $$ = sel => document.querySelector(sel);
 
@@ -18,7 +18,6 @@ document.addEventListener("DOMContentLoaded", () => {
         engineBadge:    $("model-status-badge"),
 
         // Feed section
-        liveIndicator:  $("live-indicator"),
         loadingOverlay: $("loading-overlay"),
         loadingTitle:   $("loading-title"),
         loadingDesc:    $("loading-desc"),
@@ -51,11 +50,15 @@ document.addEventListener("DOMContentLoaded", () => {
         volumeSlider:   $("slider-volume"),
         volumeVal:      $("val-volume-new"),
 
-        // Filter buttons
+        // Filters Search & List
+        filterSearch:   $("filter-search"),
+        filterGrid:     $("filter-grid"),
+        filterBadge:    $("filter-active-badge"),
+
+        // Filter Action buttons
         btnSelectAll:   $("btn-select-all"),
         btnSelectNone:  $("btn-select-none"),
         btnInvert:      $("btn-invert"),
-        filterBadge:    $("filter-active-badge"),
 
         // Data actions
         btnExportCsv:   $("btn-export-csv-new"),
@@ -67,22 +70,81 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     /* -------------------------------------------------------
-       STATE
-    ------------------------------------------------------- */
-    const TARGET_KEYS = [
-        "person","cell_phone","laptop","keyboard","cup","bottle",
-        "chair","couch","potted_plant","book","clock","scissors",
-        "backpack","umbrella","dog","cat",
-        "handbag","tie","suitcase","bicycle","mouse"
-    ];
+       HIGH-SCALE FILTER DATA (170+ Categories)
+     ------------------------------------------------------- */
+    const FILTER_CATEGORIES = {
+        "Vehicles & Transit": [
+            "car", "bicycle", "motorcycle", "airplane", "bus", "train", 
+            "truck", "boat", "helicopter", "ambulance", "fire_engine", 
+            "police_car", "skateboard", "stroller", "wheelchair", "traffic_light",
+            "fire_hydrant", "stop_sign", "parking_meter"
+        ],
+        "Electronics & Utilities": [
+            "tv", "laptop", "mouse", "remote", "keyboard", "cell_phone", 
+            "microwave", "oven", "toaster", "refrigerator", "camera", 
+            "headphone", "speaker", "clock", "phone", "computer", 
+            "router", "game_console"
+        ],
+        "Animals": [
+            "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", 
+            "bear", "zebra", "giraffe", "lion", "tiger", "monkey", 
+            "rabbit", "deer", "squirrel", "fish", "snake", "frog"
+        ],
+        "Indoor & Furniture": [
+            "chair", "couch", "bed", "dining_table", "toilet", "bench", 
+            "desk", "shelf", "wardrobe", "mirror", "window", "door", 
+            "lamp", "vase", "rug", "pillow", "blanket", "drawer"
+        ],
+        "Kitchen & Dining": [
+            "bottle", "wine_glass", "cup", "fork", "knife", "spoon", 
+            "bowl", "plate", "pot", "pan", "kettle", "glass", "mug", 
+            "pitcher", "sink", "fork", "knife", "spoon", "bowl"
+        ],
+        "Sports & Outdoor": [
+            "frisbee", "skis", "snowboard", "sports_ball", "kite", 
+            "baseball_bat", "baseball_glove", "surfboard", "tennis_racket", 
+            "golf_club", "backpack", "umbrella", "suitcase"
+        ],
+        "Personal & Clothing": [
+            "person", "handbag", "tie", "watch", "glasses", "shoes", 
+            "socks", "pants", "shirt", "jacket", "hat", "scarf", 
+            "glove", "wallet", "ring"
+        ],
+        "Office & Tools": [
+            "book", "scissors", "pen", "pencil", "paper", "folder", 
+            "calendar", "calculator", "stapler", "ruler", "tape", 
+            "hammer", "screwdriver", "wrench", "pliers", "drill"
+        ],
+        "Food": [
+            "banana", "apple", "sandwich", "orange", "broccoli", "carrot", 
+            "hot_dog", "pizza", "donut", "cake", "bread", "cheese", 
+            "egg", "milk", "butter", "meat", "chicken", "fruit", "vegetable"
+        ],
+        "General / Other": [
+            "potted_plant", "teddy_bear", "hair_drier", "toothbrush", 
+            "toothpaste", "soap", "brush", "comb", "key", "coin", 
+            "toy", "box", "bin", "basket", "bucket", "broom"
+        ]
+    };
 
+    // Flatten keys to build target set & retain quick search capabilities
+    const TARGET_KEYS = [];
+    for (const cat in FILTER_CATEGORIES) {
+        FILTER_CATEGORIES[cat] = [...new Set(FILTER_CATEGORIES[cat])]; // Remove duplicates
+        TARGET_KEYS.push(...FILTER_CATEGORIES[cat]);
+    }
+    const ALL_UNIQUE_KEYS = [...new Set(TARGET_KEYS)];
+
+    /* -------------------------------------------------------
+       STATE
+     ------------------------------------------------------- */
     const state = {
         model:          null,
         ready:          false,
         active:         false,
         deviceId:       null,
         threshold:      0.65,
-        targets:        new Set(TARGET_KEYS),
+        targets:        new Set(ALL_UNIQUE_KEYS), // Default: all active
 
         fps:            0,
         latency:        0,
@@ -106,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* -------------------------------------------------------
        CLOCK
-    ------------------------------------------------------- */
+     ------------------------------------------------------- */
     function tick() {
         if (!el.timestamp) return;
         const d   = new Date();
@@ -119,20 +181,128 @@ document.addEventListener("DOMContentLoaded", () => {
     setInterval(tick, 1000);
 
     /* -------------------------------------------------------
-       ENGINE BADGE
-    ------------------------------------------------------- */
+       ENGINE STATUS ACCENT BADGE
+     ------------------------------------------------------- */
     function setBadge(mode, text) {
         if (!el.engineBadge) return;
-        el.engineBadge.className = `engine-badge badge-${mode}`;
-        el.engineBadge.innerHTML =
-            mode === "loading" ? `<i class="fa-solid fa-circle-notch fa-spin"></i> ${text}` :
-            mode === "online"  ? `<i class="fa-solid fa-circle-check"></i> ${text}` :
-                                 `<i class="fa-solid fa-circle-xmark"></i> ${text}`;
+        el.engineBadge.className = `status-badge`;
+        
+        let dotColor = "amber";
+        let spinIcon = "";
+        
+        if (mode === "loading") {
+            dotColor = "amber";
+            spinIcon = `<i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 6px;"></i>`;
+        } else if (mode === "online") {
+            dotColor = "green";
+        } else {
+            dotColor = "red";
+        }
+
+        el.engineBadge.innerHTML = `<span class="status-dot ${dotColor}"></span> ${spinIcon}${text}`;
+    }
+
+    /* -------------------------------------------------------
+       DYNAMIC FILTER RENDERER WITH LOGICAL GROUPINGS & SEARCH
+     ------------------------------------------------------- */
+    function getCategoryIcon(key) {
+        if (key === "person") return "fa-solid fa-user";
+        if (key === "car" || key === "truck" || key === "bus" || key === "ambulance" || key === "police_car" || key === "fire_engine") return "fa-solid fa-car";
+        if (key === "bicycle" || key === "motorcycle") return "fa-solid fa-bicycle";
+        if (key === "airplane" || key === "helicopter") return "fa-solid fa-plane";
+        if (key === "boat") return "fa-solid fa-ship";
+        if (key === "tv" || key === "laptop" || key === "computer") return "fa-solid fa-desktop";
+        if (key === "mouse") return "fa-solid fa-mouse";
+        if (key === "keyboard") return "fa-solid fa-keyboard";
+        if (key === "cell_phone" || key === "phone") return "fa-solid fa-mobile-screen-button";
+        if (key === "dog") return "fa-solid fa-dog";
+        if (key === "cat") return "fa-solid fa-cat";
+        if (key === "backpack") return "fa-solid fa-backpack";
+        if (key === "umbrella") return "fa-solid fa-umbrella";
+        if (key === "handbag") return "fa-solid fa-bag-shopping";
+        if (key === "tie") return "fa-solid fa-tie";
+        if (key === "suitcase") return "fa-solid fa-suitcase";
+        if (key === "book") return "fa-solid fa-book";
+        if (key === "clock") return "fa-solid fa-clock";
+        if (key === "scissors") return "fa-solid fa-scissors";
+        if (key === "bottle") return "fa-solid fa-bottle-water";
+        if (key === "cup" || key === "mug" || key === "glass") return "fa-solid fa-cup-togo";
+        if (key === "chair" || key === "couch" || key === "bench") return "fa-solid fa-chair";
+        if (key === "potted_plant") return "fa-solid fa-seedling";
+        if (key === "key") return "fa-solid fa-key";
+        if (key === "wallet") return "fa-solid fa-wallet";
+        if (key === "apple" || key === "banana" || key === "sandwich" || key === "orange" || key === "pizza") return "fa-solid fa-utensils";
+        // Default fallbacks
+        return "fa-solid fa-tag";
+    }
+
+    function capitalizeFirst(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function renderFilters() {
+        if (!el.filterGrid) return;
+        const q = (el.filterSearch?.value || "").trim().toLowerCase();
+        el.filterGrid.innerHTML = "";
+
+        let hasAnyVisible = false;
+
+        for (const [category, items] of Object.entries(FILTER_CATEGORIES)) {
+            // Check if items match query search
+            const matchedItems = items.filter(item => {
+                const formatted = item.replace(/_/g, " ").toLowerCase();
+                return item.includes(q) || formatted.includes(q);
+            });
+
+            if (matchedItems.length === 0) continue;
+            hasAnyVisible = true;
+
+            // Create Category header
+            const header = document.createElement("div");
+            header.className = "filter-category-header";
+            header.textContent = category.toUpperCase();
+            el.filterGrid.appendChild(header);
+
+            // Create dynamic flex/grid container
+            const grid = document.createElement("div");
+            grid.className = "dynamic-filter-grid";
+
+            matchedItems.forEach(key => {
+                const isChecked = state.targets.has(key);
+                const icon = getCategoryIcon(key);
+                const labelText = capitalizeFirst(key.replace(/_/g, " "));
+
+                const label = document.createElement("label");
+                label.className = "fc-dynamic";
+                label.innerHTML = `
+                    <input type="checkbox" id="class-${key}" ${isChecked ? "checked" : ""}>
+                    <span><i class="${icon}"></i> ${labelText}</span>
+                `;
+
+                const chk = label.querySelector("input");
+                chk.addEventListener("change", e => {
+                    if (e.target.checked) {
+                        state.targets.add(key);
+                    } else {
+                        state.targets.delete(key);
+                    }
+                    updateAlarmTargetDiag();
+                });
+
+                grid.appendChild(label);
+            });
+
+            el.filterGrid.appendChild(grid);
+        }
+
+        if (!hasAnyVisible) {
+            el.filterGrid.innerHTML = `<div class="empty-state" style="padding: 18px 0; color: #475569;"><p>No classes match your search</p></div>`;
+        }
     }
 
     /* -------------------------------------------------------
        AUDIO SYNTH
-    ------------------------------------------------------- */
+     ------------------------------------------------------- */
     function initAudio() {
         if (state.audioCtx) return;
         try {
@@ -164,7 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* -------------------------------------------------------
        CHART
-    ------------------------------------------------------- */
+     ------------------------------------------------------- */
     function initChart() {
         const c = $("analytics-chart");
         if (!c) return;
@@ -175,11 +345,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 datasets: [{
                     label: "Detections",
                     data: [],
-                    backgroundColor: "rgba(0,229,200,0.15)",
-                    borderColor: "rgba(0,229,200,0.7)",
+                    backgroundColor: "rgba(0, 255, 213, 0.12)",
+                    borderColor: "rgba(0, 255, 213, 0.65)",
                     borderWidth: 1.5,
-                    barThickness: 18,
-                    hoverBackgroundColor: "rgba(0,229,200,0.3)"
+                    borderRadius: 4,
+                    barThickness: 16,
+                    hoverBackgroundColor: "rgba(0, 255, 213, 0.35)"
                 }]
             },
             options: {
@@ -188,22 +359,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: "#0b0e15",
-                        titleFont: { family: "Orbitron", size: 9, weight: "700" },
-                        bodyFont:  { family: "Orbitron", size: 9 },
-                        borderColor: "rgba(0,229,200,0.4)",
+                        backgroundColor: "#0e111a",
+                        titleFont: { family: "Inter", size: 9, weight: "700" },
+                        bodyFont:  { family: "Inter", size: 9 },
+                        borderColor: "rgba(0, 255, 213, 0.35)",
                         borderWidth: 1
                     }
                 },
                 scales: {
                     x: {
-                        grid: { color: "rgba(255,255,255,0.03)" },
-                        ticks: { color: "#5a7080", font: { family: "Orbitron", size: 8, weight: "600" } }
+                        grid: { color: "rgba(255,255,255,0.02)" },
+                        ticks: { color: "#64748b", font: { family: "Inter", size: 8, weight: "600" } }
                     },
                     y: {
-                        grid: { color: "rgba(255,255,255,0.03)" },
+                        grid: { color: "rgba(255,255,255,0.02)" },
                         beginAtZero: true,
-                        ticks: { color: "#5a7080", font: { family: "Orbitron", size: 8, weight: "600" }, stepSize: 1 }
+                        ticks: { color: "#64748b", font: { family: "Inter", size: 8, weight: "600" }, stepSize: 1 }
                     }
                 }
             }
@@ -222,7 +393,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* -------------------------------------------------------
        BACKEND API
-    ------------------------------------------------------- */
+     ------------------------------------------------------- */
     async function loadLogs() {
         try {
             const r = await fetch("/api/events");
@@ -253,7 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function clearAll() {
-        if (!confirm("Clear ALL sensor event logs?")) return;
+        if (!confirm("Wipe all persistent sensor logs?")) return;
         try {
             const r = await fetch("/api/events", { method: "DELETE" });
             if (r.ok) loadLogs();
@@ -261,8 +432,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
-       TABLE RENDERER
-    ------------------------------------------------------- */
+       TABLE LOGS RENDERER
+     ------------------------------------------------------- */
     function renderTable(logs) {
         const q  = (el.logSearch?.value || "").trim().toLowerCase();
         const fl = logs.filter(l => l.label.includes(q));
@@ -271,8 +442,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!fl.length) {
             el.logTbody.innerHTML = `<tr class="empty-row"><td colspan="5">
-                <i class="fa-solid fa-wave-square"></i>
-                <p>No events found — start detection to populate logs.</p>
+                <div class="empty-state">
+                    <i class="fa-solid fa-signature"></i>
+                    <p>No detection incident events logged matching search filters.</p>
+                </div>
             </td></tr>`;
             return;
         }
@@ -281,40 +454,40 @@ document.addEventListener("DOMContentLoaded", () => {
             const pct = Math.round(log.confidence * 100);
             const ts  = new Date(log.timestamp).toLocaleString();
             const cls = badgeClass(log.label);
-            let barColor = "#00e5c8";
-            if (log.confidence < 0.6)       barColor = "#f43f5e";
-            else if (log.confidence < 0.75) barColor = "#f59e0b";
-            else                             barColor = "#22d3a5";
+            let barColor = "var(--cyan)";
+            if (log.confidence < 0.6)       barColor = "var(--red)";
+            else if (log.confidence < 0.75) barColor = "var(--amber)";
+            else                             barColor = "var(--green)";
 
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td>#${String(log.id).padStart(4,"0")}</td>
-                <td><span class="lbadge ${cls}">${log.label}</span></td>
+                <td><span class="event-badge ${cls}">${log.label}</span></td>
                 <td>
-                    <div class="conf-cell">
-                        <div class="conf-bar"><div class="conf-fill" style="width:${pct}%;background:${barColor}"></div></div>
-                        <span class="conf-pct">${pct}%</span>
+                    <div class="conf-bar-cell">
+                        <div class="conf-track-bar"><div class="conf-track-fill" style="width:${pct}%;background:${barColor}"></div></div>
+                        <span>${pct}%</span>
                     </div>
                 </td>
                 <td>${ts}</td>
-                <td><button class="btn-del" data-id="${log.id}"><i class="fa-solid fa-trash"></i></button></td>
+                <td><button class="btn-delete-row" data-id="${log.id}"><i class="fa-solid fa-trash-can"></i></button></td>
             `;
-            tr.querySelector(".btn-del").addEventListener("click", () => deleteEvent(log.id));
+            tr.querySelector(".btn-delete-row").addEventListener("click", () => deleteEvent(log.id));
             el.logTbody.appendChild(tr);
         });
     }
 
     function badgeClass(label) {
-        if (label === "person")    return "lbadge-red";
-        if (label === "cell_phone") return "lbadge-amber";
-        if (label === "laptop")    return "lbadge-blue";
-        if (label === "dog" || label === "cat") return "lbadge-green";
-        return "";
+        if (label === "person")    return "eb-red";
+        if (label === "cell_phone" || label === "phone") return "eb-amber";
+        if (label === "laptop" || label === "computer")    return "eb-blue";
+        if (label === "dog" || label === "cat") return "eb-green";
+        return "eb-cyan";
     }
 
     /* -------------------------------------------------------
-       CAMERA MANAGEMENT
-    ------------------------------------------------------- */
+       CAMERA STREAM MANAGEMENT
+     ------------------------------------------------------- */
     async function populateCamList() {
         try {
             const devs = await navigator.mediaDevices.enumerateDevices();
@@ -322,13 +495,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!el.selectCamera) return;
             el.selectCamera.innerHTML = "";
             if (!cams.length) {
-                el.selectCamera.innerHTML = `<option>No cameras found</option>`;
+                el.selectCamera.innerHTML = `<option>No webcams found</option>`;
                 return;
             }
             cams.forEach((c, i) => {
                 const o = document.createElement("option");
                 o.value       = c.deviceId;
-                o.textContent = c.label || `Camera ${i+1}`;
+                o.textContent = c.label || `Surveillance Camera ${i+1}`;
                 if (c.deviceId === state.deviceId) o.selected = true;
                 el.selectCamera.appendChild(o);
             });
@@ -338,7 +511,6 @@ document.addEventListener("DOMContentLoaded", () => {
     async function pickBestCamera() {
         const VIRTUAL = ["link to windows","phone link","virtual","droidcam","epoccam","ivcam","disconnected"];
         try {
-            // brief request to unlock labels
             const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
             tmp.getTracks().forEach(t => t.stop());
         } catch(_) {}
@@ -357,11 +529,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function startCamera() {
         initAudio();
-        showLoading("CONNECTING WEBCAM", "Requesting camera stream...");
+        showLoading("CONNECTING SENSOR FEED", "Tuning secure pipeline stream...");
 
         if (_camTimer) clearTimeout(_camTimer);
         _camTimer = setTimeout(() => {
-            if (!state.active) showLoading("TIMEOUT", "Select your webcam in the dropdown below.");
+            if (!state.active) showLoading("FEED TIMEOUT", "Please choose target webcam dropdown source.");
         }, 6000);
 
         const constraints = {
@@ -379,15 +551,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch (firstErr) {
                 if (state.deviceId) {
-                    console.warn("Primary camera stream busy or unavailable. Attempting generic fallback...", firstErr);
+                    console.warn("Target webcam stream busy. Toggling generic fallback...", firstErr);
                     stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 }
-                        },
+                        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
                         audio: false
                     });
-                    // Reset deviceId to let browser selection take over
                     state.deviceId = null;
                 } else {
                     throw firstErr;
@@ -411,7 +579,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (el.vpStandby) el.vpStandby.classList.add("hide");
                 if (el.diagSensorState) {
                     el.diagSensorState.textContent = "ACTIVE";
-                    el.diagSensorState.className   = "diag-value text-cyan";
+                    el.diagSensorState.className   = "m-value text-green";
                 }
 
                 requestAnimationFrame(loop);
@@ -422,7 +590,7 @@ document.addEventListener("DOMContentLoaded", () => {
             setPowerUI(false);
             if (el.vpStandby) el.vpStandby.classList.remove("hide");
             console.error("Camera error:", err.name, err.message);
-            alert(`Camera error: ${err.name} — ${err.message}`);
+            alert(`Stream error: ${err.name} — ${err.message}`);
         }
     }
 
@@ -442,7 +610,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (el.latencyDisplay) el.latencyDisplay.textContent = "0 ms";
         if (el.diagSensorState) {
             el.diagSensorState.textContent = "STANDBY";
-            el.diagSensorState.className   = "diag-value text-amber";
+            el.diagSensorState.className   = "m-value text-amber";
         }
     }
 
@@ -468,8 +636,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
-       DETECTION LOOP
-    ------------------------------------------------------- */
+       INFERENCE LOOP
+     ------------------------------------------------------- */
     async function loop() {
         if (!state.active) return;
         const t0 = performance.now();
@@ -495,8 +663,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
-       PROCESS + DRAW DETECTIONS
-    ------------------------------------------------------- */
+       PROCESS + RENDER DETECTIONS
+     ------------------------------------------------------- */
     function processDetections(preds) {
         ctx2d.clearRect(0, 0, el.canvas.width, el.canvas.height);
 
@@ -533,15 +701,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
-       HUD BOUNDING BOX RENDERER
-    ------------------------------------------------------- */
+       HUD CANVAS OVERLAY
+     ------------------------------------------------------- */
     const PALETTE = {
-        person:    { c:"#f43f5e", d:"rgba(244,63,94,0.1)",    g:"rgba(244,63,94,0.5)" },
-        cell_phone:{ c:"#f59e0b", d:"rgba(245,158,11,0.1)",   g:"rgba(245,158,11,0.5)" },
-        laptop:    { c:"#38bdf8", d:"rgba(56,189,248,0.1)",   g:"rgba(56,189,248,0.5)" },
-        dog:       { c:"#22d3a5", d:"rgba(34,211,165,0.1)",   g:"rgba(34,211,165,0.5)" },
-        cat:       { c:"#22d3a5", d:"rgba(34,211,165,0.1)",   g:"rgba(34,211,165,0.5)" },
-        _default:  { c:"#00e5c8", d:"rgba(0,229,200,0.1)",    g:"rgba(0,229,200,0.5)" },
+        person:    { c:"#f43f5e", d:"rgba(244,63,94,0.06)",    g:"rgba(244,63,94,0.4)" },
+        cell_phone:{ c:"#f59e0b", d:"rgba(245,158,11,0.06)",   g:"rgba(245,158,11,0.4)" },
+        laptop:    { c:"#3b82f6", d:"rgba(59,130,246,0.06)",   g:"rgba(59,130,246,0.4)" },
+        dog:       { c:"#10b981", d:"rgba(16,185,129,0.06)",   g:"rgba(16,185,129,0.4)" },
+        cat:       { c:"#10b981", d:"rgba(16,185,129,0.06)",   g:"rgba(16,185,129,0.4)" },
+        _default:  { c:"#00ffd5", d:"rgba(0, 255, 213, 0.06)",  g:"rgba(0, 255, 213, 0.4)" },
     };
 
     function drawBoxes(preds) {
@@ -552,11 +720,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const P     = PALETTE[label] || PALETTE._default;
             const cl    = Math.min(16, Math.min(w, h) / 4);
 
-            // Fill
+            // Fill background translucent box
             ctx2d.fillStyle = P.d;
             ctx2d.fillRect(x, y, w, h);
 
-            // Glowing border
+            // Stroke glowing outer frame
             ctx2d.save();
             ctx2d.strokeStyle = P.c;
             ctx2d.lineWidth   = 1.5;
@@ -567,7 +735,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Corner brackets
             ctx2d.strokeStyle = P.c;
-            ctx2d.lineWidth   = 2.5;
+            ctx2d.lineWidth   = 3.0;
             ctx2d.shadowColor = P.c;
             ctx2d.shadowBlur  = 6;
             [
@@ -584,10 +752,10 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             ctx2d.shadowBlur = 0;
 
-            // Centre tick marks
+            // Centre crosshairs
             ctx2d.strokeStyle = P.c;
             ctx2d.lineWidth   = 0.5;
-            ctx2d.globalAlpha = 0.4;
+            ctx2d.globalAlpha = 0.35;
             ctx2d.beginPath();
             ctx2d.moveTo(x+w/2, y);     ctx2d.lineTo(x+w/2, y+8);
             ctx2d.moveTo(x+w/2, y+h);   ctx2d.lineTo(x+w/2, y+h-8);
@@ -596,24 +764,24 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx2d.stroke();
             ctx2d.globalAlpha = 1;
 
-            // Label badge
-            const txt = `${label.replace(/_/g," ").toUpperCase()} ${score}%`;
-            ctx2d.font = `bold 8px 'Orbitron', monospace`;
-            const tw   = ctx2d.measureText(txt).width;
+            // Floating Label Banner
+            const textString = `${label.replace(/_/g," ").toUpperCase()} ${score}%`;
+            ctx2d.font = `600 9px 'Inter', sans-serif`;
+            const textWidth = ctx2d.measureText(textString).width;
 
             ctx2d.fillStyle   = P.c;
             ctx2d.shadowColor = P.c;
             ctx2d.shadowBlur  = 6;
-            ctx2d.fillRect(x, y - 17, tw + 12, 17);
+            ctx2d.fillRect(x, y - 18, textWidth + 14, 18);
             ctx2d.shadowBlur  = 0;
 
-            ctx2d.fillStyle = "#060a0f";
-            ctx2d.fillText(txt, x + 6, y - 5);
+            ctx2d.fillStyle = "#07090e";
+            ctx2d.fillText(textString, x + 7, y - 6);
 
-            // Radar line from centre
-            ctx2d.strokeStyle = "rgba(0,229,200,0.08)";
+            // Vector center sweep lines
+            ctx2d.strokeStyle = "rgba(0, 255, 213, 0.05)";
             ctx2d.lineWidth   = 0.5;
-            ctx2d.globalAlpha = 0.5;
+            ctx2d.globalAlpha = 0.4;
             ctx2d.beginPath();
             ctx2d.moveTo(el.canvas.width/2, el.canvas.height/2);
             ctx2d.lineTo(x+w/2, y+h/2);
@@ -623,17 +791,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
-       EVENT LISTENERS
-    ------------------------------------------------------- */
+       EVENT BINDINGS
+     ------------------------------------------------------- */
 
-    // Sensor Power toggle
+    // Sensor Switch Power
     if (el.powerSwitch) {
         el.powerSwitch.addEventListener("change", e => {
             if (e.target.checked) startCamera(); else stopCamera();
         });
     }
 
-    // Camera dropdown
+    // Input dropdown source
     if (el.selectCamera) {
         el.selectCamera.addEventListener("change", e => {
             state.deviceId = e.target.value;
@@ -641,7 +809,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Confidence threshold
+    // Threshold sensitivity control
     if (el.threshSlider) {
         const syncThresh = val => {
             state.threshold = val / 100;
@@ -651,7 +819,7 @@ document.addEventListener("DOMContentLoaded", () => {
         syncThresh(+el.threshSlider.value);
     }
 
-    // Alarm switch
+    // Siren alarm toggle
     if (el.alarmSwitch) {
         el.alarmSwitch.addEventListener("change", e => {
             state.alarmOn = e.target.checked;
@@ -662,7 +830,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Volume slider
+    // Alarm Volume control
     if (el.volumeSlider) {
         el.volumeSlider.addEventListener("input", e => {
             state.volume = e.target.value / 100;
@@ -670,90 +838,92 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Target checkboxes
-    TARGET_KEYS.forEach(key => {
-        const box = $(` class-${key}`.trim()) || $(`class-${key}`);
-        if (box) {
-            box.addEventListener("change", e => {
-                if (e.target.checked) state.targets.add(key);
-                else                  state.targets.delete(key);
-                updateAlarmTargetDiag();
-            });
-        }
-    });
+    // Search filters listener
+    if (el.filterSearch) {
+        el.filterSearch.addEventListener("input", () => {
+            renderFilters();
+        });
+    }
 
+    // Update diagnosis info status
     function updateAlarmTargetDiag() {
-        if (el.diagAlarmTarget) {
-            el.diagAlarmTarget.textContent =
-                state.targets.size === TARGET_KEYS.length ? "ALL" :
-                state.targets.size === 0 ? "NONE" :
-                `${state.targets.size} CLASS`;
-        }
+        if (!el.diagAlarmTarget) return;
+        el.diagAlarmTarget.textContent =
+            state.targets.size === ALL_UNIQUE_KEYS.length ? "ALL" :
+            state.targets.size === 0 ? "NONE" :
+            `${state.targets.size} CLASS`;
+
         if (el.filterBadge) {
-            el.filterBadge.textContent = state.targets.size + " ACTIVE";
+            el.filterBadge.textContent = `${state.targets.size} ACTIVE`;
         }
     }
 
+    // Bulk selections
     if (el.btnSelectAll) {
         el.btnSelectAll.addEventListener("click", () => {
-            TARGET_KEYS.forEach(k => {
-                const b = $(`class-${k}`);
-                if (b) { b.checked = true; state.targets.add(k); }
+            ALL_UNIQUE_KEYS.forEach(k => state.targets.add(k));
+            ALL_UNIQUE_KEYS.forEach(k => {
+                const b = document.getElementById(`class-${k}`);
+                if (b) b.checked = true;
             });
             updateAlarmTargetDiag();
         });
     }
+
     if (el.btnSelectNone) {
         el.btnSelectNone.addEventListener("click", () => {
-            TARGET_KEYS.forEach(k => {
-                const b = $(`class-${k}`);
-                if (b) { b.checked = false; state.targets.delete(k); }
+            state.targets.clear();
+            ALL_UNIQUE_KEYS.forEach(k => {
+                const b = document.getElementById(`class-${k}`);
+                if (b) b.checked = false;
             });
             updateAlarmTargetDiag();
         });
     }
+
     if (el.btnInvert) {
         el.btnInvert.addEventListener("click", () => {
-            TARGET_KEYS.forEach(k => {
-                const b = $(`class-${k}`);
-                if (!b) return;
-                if (b.checked) {
-                    b.checked = false;
+            ALL_UNIQUE_KEYS.forEach(k => {
+                if (state.targets.has(k)) {
                     state.targets.delete(k);
+                    const b = document.getElementById(`class-${k}`);
+                    if (b) b.checked = false;
                 } else {
-                    b.checked = true;
                     state.targets.add(k);
+                    const b = document.getElementById(`class-${k}`);
+                    if (b) b.checked = true;
                 }
             });
             updateAlarmTargetDiag();
         });
     }
 
-    // Log search
+    // Incident log table search query
     if (el.logSearch) {
         el.logSearch.addEventListener("input", () => renderTable(state.logs));
     }
 
-    // Export CSV
+    // System exports logs to CSV file
     if (el.btnExportCsv) {
         el.btnExportCsv.addEventListener("click", () => { window.location.href = "/api/export"; });
     }
 
-    // Clear DB
+    // Wipe logs database
     if (el.btnClearDb) {
         el.btnClearDb.addEventListener("click", clearAll);
     }
 
     /* -------------------------------------------------------
-       INITIALISATION
-    ------------------------------------------------------- */
+       INITIALIZATION
+     ------------------------------------------------------- */
     async function init() {
         initChart();
+        renderFilters();
+        updateAlarmTargetDiag();
         await loadLogs();
         await populateCamList();
 
-        // Show standby state while model loads
-        showLoading("INITIALIZING NEURAL NET", "Downloading COCO-SSD model weights...");
+        showLoading("INITIALIZING NEURAL NET", "Fetching COCO-SSD weights from node...");
 
         try {
             state.model = await cocoSsd.load();
@@ -761,16 +931,13 @@ document.addEventListener("DOMContentLoaded", () => {
             setBadge("online", "ONLINE");
             hideLoading();
 
-            // Show standby icon — waiting for user to toggle power
             if (el.vpStandby) el.vpStandby.classList.remove("hide");
-
-            // Pick best camera but DON'T auto-start — let user toggle sensor power
             await pickBestCamera();
 
         } catch(e) {
-            console.error("Model load failed:", e);
+            console.error("TensorFlow initialization error:", e);
             setBadge("error", "ERROR");
-            showLoading("MODEL LOAD FAILED", "Check internet connection and reload.");
+            showLoading("NEURAL NETWORK ERROR", "Network error. Check server logs.");
         }
     }
 

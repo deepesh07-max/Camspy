@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="CamSpy - Autonomous real-time AI object detection sensor hub using TensorFlow.js COCO-SSD.">
-    <title>CamSpy // System Object Tracker</title>
+    <meta name="description" content="CamSpy - Modern autonomous AI object detection dashboard inspired by premium cyber-surveillance hubs.">
+    <title>CamSpy // AI Surveillance Dashboard</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -25,345 +25,390 @@
 </head>
 <body>
 
-<!-- ===================== HEADER ===================== -->
-<header class="hud-header">
-    <div class="header-brand">
-        <div class="brand-logo">
-            <span class="brand-name">CAMSPY</span>
-            <span class="brand-tagline">// SYSTEM OBJECT TRACKER</span>
+<!-- ===================== TOP HEADER (Resq.io Style) ===================== -->
+<header class="dashboard-header">
+    <div class="header-left">
+        <div class="logo-wrapper">
+            <span class="logo-title">CamSpy<span class="dot">.io</span></span>
+            <span class="logo-subtitle">// SECURE SENTINEL NET</span>
         </div>
+        
+        <!-- Navigation Tabs (Resq.io Style) -->
+        <nav class="nav-pills">
+            <button class="nav-pill active"><i class="fa-solid fa-gauge"></i> Overview</button>
+            <button class="nav-pill"><i class="fa-solid fa-video"></i> Live Feed</button>
+            <button class="nav-pill"><i class="fa-solid fa-list-check"></i> Incidents</button>
+            <button class="nav-pill"><i class="fa-solid fa-chart-simple"></i> Metrics</button>
+            <button class="nav-pill"><i class="fa-solid fa-circle-nodes"></i> Diagnostics</button>
+        </nav>
     </div>
 
-    <div class="header-meta">
-        <div class="meta-item">
-            <span class="meta-label">SIGNAL</span>
-            <div class="signal-value">
-                <span class="signal-bars">
-                    <span class="bar b1"></span>
-                    <span class="bar b2"></span>
-                    <span class="bar b3"></span>
-                    <span class="bar b4"></span>
-                </span>
-                <span class="signal-text">SECURE</span>
+    <div class="header-right">
+        <!-- Search bar in header -->
+        <div class="header-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" placeholder="Global search..." disabled>
+        </div>
+
+        <!-- Notification Bell -->
+        <button class="header-icon-btn">
+            <i class="fa-regular fa-bell"></i>
+            <span class="badge-dot"></span>
+        </button>
+
+        <!-- User Profile Avatar (Caroline Style) -->
+        <div class="user-profile">
+            <div class="avatar">
+                <span>CS</span>
             </div>
-        </div>
-
-        <div class="meta-divider"></div>
-
-        <div class="meta-item">
-            <span class="meta-label">LOCAL TIMESTAMP</span>
-            <span class="meta-value text-cyan" id="header-timestamp">----.--.-- --:--:--</span>
-        </div>
-
-        <div class="meta-divider"></div>
-
-        <div class="meta-item">
-            <span class="meta-label">ENGINE STATUS</span>
-            <div id="model-status-badge" class="engine-badge badge-loading">
-                <i class="fa-solid fa-circle-notch fa-spin"></i> LOADING
+            <div class="user-info">
+                <span class="user-name">Operator // Admin</span>
+                <span class="user-role">Node-04 Active</span>
             </div>
         </div>
     </div>
 </header>
 
-<!-- ===================== MAIN LAYOUT ===================== -->
-<main class="hud-main">
-
-    <!-- ========== LEFT: CAMERA FEED ========== -->
-    <section class="feed-section" id="feed-section">
-        <!-- Corner HUD brackets -->
-        <div class="bracket tl"></div>
-        <div class="bracket tr"></div>
-        <div class="bracket bl"></div>
-        <div class="bracket br"></div>
-
-        <!-- Feed top bar -->
-        <div class="feed-topbar">
-            <div class="live-indicator" id="live-indicator">
-                <span class="live-dot"></span>
-                <span>LIVE</span>
+<!-- ===================== MAIN HERO SECTION ===================== -->
+<section class="hero-banner">
+    <div class="hero-text">
+        <h1 class="welcome-title">System Console // <span class="highlight">Active Operator</span></h1>
+        
+        <!-- Small circular status tags -->
+        <div class="status-tags">
+            <div class="tag-item">
+                <div class="tag-circle color-cyan">20%</div>
+                <span class="tag-label">CPU LOAD</span>
             </div>
-            <span class="feed-label">// FEED: CAM01</span>
+            <div class="tag-item">
+                <div class="tag-circle color-white">42%</div>
+                <span class="tag-label">RAM USAGE</span>
+            </div>
+            <div class="tag-item">
+                <div class="tag-circle color-dim">15%</div>
+                <span class="tag-label">DB LOAD</span>
+            </div>
+            <div class="tag-item font-dashed">
+                <div class="tag-circle color-stripe">SEC</div>
+                <span class="tag-label">ENCRYPTED</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Telemetry Row (Metric indicators on right) -->
+    <div class="top-telemetry">
+        <div class="metric-card card-cyan">
+            <div class="metric-header">
+                <span class="metric-label">CRITICAL DETECTIONS</span>
+                <span class="badge trend-up"><i class="fa-solid fa-arrow-trend-up"></i> +12%</span>
+            </div>
+            <div class="metric-body">
+                <span class="metric-number" id="cumulative-counter">0</span>
+                <span class="metric-sub">Logged events</span>
+            </div>
         </div>
 
-        <!-- Viewport -->
-        <div class="viewport" id="viewport">
-
-            <!-- Crosshair scan lines -->
-            <div class="crosshair-h"></div>
-            <div class="crosshair-v"></div>
-
-            <!-- Animated scan line -->
-            <div class="scanline"></div>
-
-            <!-- Loading / Model Init Overlay -->
-            <div class="vp-overlay" id="loading-overlay">
-                <div class="vp-overlay-content">
-                    <div class="hud-spinner">
-                        <i class="fa-solid fa-compact-disc fa-spin"></i>
-                    </div>
-                    <div class="vp-overlay-title" id="loading-title">INITIALIZING NEURAL NET</div>
-                    <div class="vp-overlay-desc" id="loading-desc">Downloading COCO-SSD model...</div>
-                    <div class="model-progress-bar" id="model-progress">
-                        <div class="model-progress-fill" id="progress-fill"></div>
-                    </div>
-                </div>
+        <div class="metric-card card-green">
+            <div class="metric-header">
+                <span class="metric-label">FRAME RATE</span>
+                <span class="badge trend-up"><i class="fa-solid fa-arrow-trend-up"></i> +5%</span>
             </div>
-
-            <!-- Standby icon (shown when camera is off but model is loaded) -->
-            <div class="vp-standby" id="vp-standby">
-                <div class="standby-grid-overlay"></div>
-                <div class="standby-scan"></div>
-                <div class="standby-content">
-                    <div class="standby-icon">
-                        <i class="fa-regular fa-circle-pause"></i>
-                    </div>
-                    <div class="standby-label">SENSOR STANDBY</div>
-                    <div class="standby-sub">Toggle Sensor Power to begin detection</div>
-                </div>
+            <div class="metric-body">
+                <span class="metric-number" id="fps-display">0 FPS</span>
+                <span class="metric-sub">Camera decode</span>
             </div>
-
-            <!-- Detection Alert Banner -->
-            <div class="alert-strip hide" id="detection-alert-banner">
-                <i class="fa-solid fa-circle-exclamation"></i>
-                <span id="alert-banner-text">TARGET LOCKED</span>
-            </div>
-
-            <!-- REC badge -->
-            <div class="rec-badge" id="rec-badge">
-                <span class="rec-dot"></span> REC
-            </div>
-
-            <!-- Video + canvas -->
-            <video id="webcam" autoplay playsinline muted></video>
-            <canvas id="hud-overlay"></canvas>
         </div>
 
-        <!-- Bottom telemetry strip -->
-        <div class="feed-stats">
-            <div class="feed-stat">
-                <span class="fstat-label">CAMERA RESOLUTION</span>
-                <span class="fstat-value pg-val">-- x --</span>
+        <div class="metric-card card-red">
+            <div class="metric-header">
+                <span class="metric-label">INFERENCE TIME</span>
+                <span class="badge trend-down"><i class="fa-solid fa-arrow-trend-down"></i> -15%</span>
             </div>
-            <div class="fstat-sep"></div>
-            <div class="feed-stat">
-                <span class="fstat-label">FRAME RATE</span>
-                <span class="fstat-value text-cyan" id="fps-display">0 FPS</span>
+            <div class="metric-body">
+                <span class="metric-number" id="latency-display">0 ms</span>
+                <span class="metric-sub">GPU Processing</span>
             </div>
-            <div class="fstat-sep"></div>
-            <div class="feed-stat">
-                <span class="fstat-label">INFERENCE SPEED</span>
-                <span class="fstat-value" id="latency-display">0 ms</span>
+        </div>
+    </div>
+</section>
+
+<!-- ===================== DASHBOARD MAIN GRID ===================== -->
+<main class="dashboard-grid">
+
+    <!-- ========== LEFT COLUMN: VIEWPORT & TELEMETRY ========== -->
+    <section class="left-column">
+        <!-- Viewport Card -->
+        <div class="viewport-card">
+            <!-- HUD decorative brackets -->
+            <div class="bracket tl"></div>
+            <div class="bracket tr"></div>
+            <div class="bracket bl"></div>
+            <div class="bracket br"></div>
+
+            <!-- Feed header line -->
+            <div class="viewport-header">
+                <div class="live-tag">
+                    <span class="live-dot"></span>
+                    <span>LIVE FEED</span>
+                </div>
+                <span class="feed-id">// CAMERA_INPUT_01</span>
             </div>
-            <!-- Keep hidden refs for JS compat -->
-            <span id="val-fps-new" style="display:none"></span>
-            <span id="val-latency-new" style="display:none"></span>
+
+            <!-- Webcam & Overlay Area -->
+            <div class="viewport-container" id="viewport">
+                <!-- Grid scanning line -->
+                <div class="viewport-scanline"></div>
+
+                <!-- Model Loading Overlay -->
+                <div class="vp-overlay" id="loading-overlay">
+                    <div class="vp-overlay-content">
+                        <div class="spinner-icon">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        </div>
+                        <h3 class="overlay-title" id="loading-title">INITIALIZING NEURAL NET</h3>
+                        <p class="overlay-desc" id="loading-desc">Loading COCO-SSD weights...</p>
+                        <div class="progress-bar-wrap">
+                            <div class="progress-bar-fill" id="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Standby Screen (Subtle Matrix background grid) -->
+                <div class="vp-standby" id="vp-standby">
+                    <div class="standby-grid-overlay"></div>
+                    <div class="standby-scan"></div>
+                    <div class="standby-content">
+                        <div class="standby-logo">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <h2 class="standby-title">SENSOR STANDBY</h2>
+                        <p class="standby-subtitle">Toggle SENSOR POWER on the panel to begin tracking</p>
+                    </div>
+                </div>
+
+                <!-- Detection Alert Strip -->
+                <div class="detection-alert-strip hide" id="detection-alert-banner">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="alert-banner-text">TARGET ACQUIRED // LOCK CONFIRMED</span>
+                </div>
+
+                <!-- REC status pill -->
+                <div class="rec-badge" id="rec-badge">
+                    <span class="rec-dot"></span> SECURE REC
+                </div>
+
+                <!-- Video elements -->
+                <video id="webcam" autoplay playsinline muted></video>
+                <canvas id="hud-overlay"></canvas>
+            </div>
+
+            <!-- Telemetry summary footer -->
+            <div class="viewport-footer">
+                <div class="footer-stat">
+                    <span class="f-label">SOURCE DIMENSION</span>
+                    <span class="f-value pg-val">-- x --</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="footer-stat">
+                    <span class="f-label">ENGINE STATUS</span>
+                    <span class="status-badge" id="model-status-badge">
+                        <span class="status-dot green"></span> ONLINE
+                    </span>
+                </div>
+            </div>
         </div>
     </section>
 
-    <!-- ========== RIGHT: CONTROL PANEL ========== -->
-    <aside class="control-section">
+    <!-- ========== RIGHT COLUMN: SIDEBAR CONTROLS ========== -->
+    <aside class="right-column">
 
-        <!-- DIAGNOSTIC OVERVIEW -->
-        <div class="panel-block">
-            <div class="panel-block-title">// DIAGNOSTIC OVERVIEW</div>
-
-            <div class="diag-grid">
-                <div class="diag-card">
-                    <div class="diag-icon icon-amber"><i class="fa-solid fa-bolt"></i></div>
-                    <div class="diag-info">
-                        <span class="diag-label">SENSOR STATE</span>
-                        <span class="diag-value text-amber" id="diag-sensor-state">STANDBY</span>
-                    </div>
+        <!-- DIAGNOSTIC STATS CARD -->
+        <div class="panel-card diagnostic-card">
+            <div class="card-title">// DIAGNOSTIC INTEGRITY</div>
+            <div class="diag-matrix">
+                <div class="matrix-item">
+                    <span class="m-label">SENSOR STATE</span>
+                    <span class="m-value text-amber" id="diag-sensor-state">STANDBY</span>
                 </div>
-                <div class="diag-card">
-                    <div class="diag-icon icon-cyan"><i class="fa-solid fa-crosshairs"></i></div>
-                    <div class="diag-info">
-                        <span class="diag-label">ACTIVE ALARM TARGET</span>
-                        <span class="diag-value text-cyan" id="diag-alarm-target">ALL</span>
-                    </div>
+                <div class="matrix-item">
+                    <span class="m-label">ACTIVE ALARM TARGET</span>
+                    <span class="m-value text-cyan" id="diag-alarm-target">ALL</span>
                 </div>
-                <div class="diag-card">
-                    <div class="diag-icon icon-blue"><i class="fa-solid fa-list-check"></i></div>
-                    <div class="diag-info">
-                        <span class="diag-label">LOGGED EVENTS</span>
-                        <span class="diag-value text-blue" id="cumulative-counter">0</span>
-                    </div>
-                </div>
-                <div class="diag-card">
-                    <div class="diag-icon icon-orange"><i class="fa-solid fa-volume-high"></i></div>
-                    <div class="diag-info">
-                        <span class="diag-label">SYNTH STATUS</span>
-                        <span class="diag-value text-orange" id="diag-synth-status">ONLINE</span>
-                    </div>
+                <div class="matrix-item">
+                    <span class="m-label">AUDIO SYNTH</span>
+                    <span class="m-value text-orange" id="diag-synth-status">ONLINE</span>
                 </div>
             </div>
         </div>
 
-        <!-- PARAMETERS & SENSOR LOGIC -->
-        <div class="panel-block">
-            <div class="panel-block-title">// PARAMETERS &amp; SENSOR LOGIC</div>
+        <!-- CONTROLS CARD -->
+        <div class="panel-card controls-card">
+            <div class="card-title">// SENSOR SYSTEM PARAMETERS</div>
 
-            <!-- Sensor Power toggle -->
-            <div class="param-row">
-                <div class="param-info">
-                    <span class="param-label">SENSOR POWER</span>
-                    <span class="param-desc">Activate webcam object tracking</span>
+            <!-- Sensor Power Switch -->
+            <div class="control-row">
+                <div class="control-info">
+                    <span class="ctrl-title">SENSOR POWER</span>
+                    <span class="ctrl-desc">Enable core webcam tracking pipeline</span>
                 </div>
-                <label class="power-toggle">
+                <label class="switch-toggle">
                     <input type="checkbox" id="switch-sensor-power-new">
-                    <span class="power-slider"></span>
+                    <span class="switch-slider"></span>
                 </label>
             </div>
-            <!-- Hidden clickable power text button kept for JS compat -->
+            <!-- Hidden refs for script compatibility -->
             <div id="btn-camera-power-text" style="display:none"></div>
 
-            <!-- Select Input Source -->
-            <div class="param-col">
-                <span class="param-label">SELECT INPUT SOURCE</span>
-                <div class="hud-select-wrapper">
-                    <select id="select-camera" class="hud-select">
-                        <option value="">Detecting sources...</option>
+            <!-- Input Dropdown -->
+            <div class="control-col">
+                <span class="ctrl-title">SELECT INPUT SOURCE</span>
+                <div class="dropdown-wrapper">
+                    <select id="select-camera" class="custom-select">
+                        <option value="">Querying input devices...</option>
                     </select>
-                    <i class="fa-solid fa-chevron-down select-caret"></i>
+                    <i class="fa-solid fa-chevron-down caret-icon"></i>
                 </div>
             </div>
 
-            <!-- Confidence Threshold -->
-            <div class="param-col">
-                <div class="param-row-inline">
-                    <span class="param-label">CONFIDENCE THRESHOLD</span>
-                    <span class="param-value text-cyan" id="stat-threshold">65%</span>
+            <!-- Threshold Slider -->
+            <div class="control-col">
+                <div class="flex-between">
+                    <span class="ctrl-title">DETECTION THRESHOLD</span>
+                    <span class="ctrl-value text-cyan" id="stat-threshold">65%</span>
                 </div>
-                <div class="slider-wrap">
-                    <input type="range" id="slider-threshold-new" min="40" max="95" value="65" class="hud-range">
-                    <div class="range-ticks">
+                <div class="slider-container">
+                    <input type="range" id="slider-threshold-new" min="40" max="95" value="65" class="custom-range range-cyan">
+                    <div class="range-labels">
                         <span>40%</span><span>65%</span><span>95%</span>
                     </div>
                 </div>
-                <!-- Hidden tooltip for JS compat -->
+                <!-- Hidden refs for script compatibility -->
                 <div id="dial-tooltip" style="display:none">65%</div>
             </div>
 
             <!-- Sound Alarm & Volume -->
-            <div class="param-col">
-                <div class="param-row-inline">
-                    <span class="param-label">AUDIO ALARM</span>
-                    <label class="mini-toggle">
+            <div class="control-col">
+                <div class="flex-between">
+                    <span class="ctrl-title">AUDIO SIREN ALARM</span>
+                    <label class="switch-toggle mini-switch">
                         <input type="checkbox" id="switch-sound-alarm" checked>
-                        <span class="mini-slider"></span>
+                        <span class="switch-slider"></span>
                     </label>
                 </div>
-                <div class="slider-wrap">
-                    <span class="param-desc">Volume</span>
-                    <input type="range" id="slider-volume" min="5" max="100" value="50" class="hud-range hud-range-amber">
-                    <span class="param-desc" id="val-volume-new">50%</span>
+                <div class="volume-slider-wrap">
+                    <span class="ctrl-desc">Volume</span>
+                    <div class="slider-container">
+                        <input type="range" id="slider-volume" min="5" max="100" value="50" class="custom-range range-amber">
+                        <div class="flex-between font-mono-small">
+                            <span>MIN</span>
+                            <span id="val-volume-new">50%</span>
+                            <span>MAX</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <!-- Top alarm button for JS compat -->
+            <!-- Hidden ref for script compatibility -->
             <button id="btn-deposit-siren" style="display:none"></button>
 
-            <!-- Target Logic Filters -->
-            <div class="param-col">
-                <div class="param-row-inline">
-                    <div class="filter-label-group">
-                        <span class="param-label">TARGET LOGIC FILTERS</span>
-                        <span class="filter-badge" id="filter-active-badge">21 ACTIVE</span>
+            <!-- TARGET LOGIC FILTERS (HIGH SCALE) -->
+            <div class="control-col target-filters-section">
+                <div class="flex-between align-center">
+                    <div class="target-title-wrap">
+                        <span class="ctrl-title">TARGET LOGIC FILTERS</span>
+                        <span class="filter-count-badge" id="filter-active-badge">-- ACTIVE</span>
                     </div>
-                    <span class="param-desc">Toggle detection categories</span>
                 </div>
-                <div class="filter-grid">
-                    <label class="fc"><input type="checkbox" id="class-person" checked><span><i class="fa-solid fa-user"></i> Person</span></label>
-                    <label class="fc"><input type="checkbox" id="class-cell_phone" checked><span><i class="fa-solid fa-mobile-screen-button"></i> Phone</span></label>
-                    <label class="fc"><input type="checkbox" id="class-laptop" checked><span><i class="fa-solid fa-laptop"></i> Laptop</span></label>
-                    <label class="fc"><input type="checkbox" id="class-keyboard" checked><span><i class="fa-solid fa-keyboard"></i> Keyboard</span></label>
-                    <label class="fc"><input type="checkbox" id="class-cup" checked><span><i class="fa-solid fa-cup-togo"></i> Cup</span></label>
-                    <label class="fc"><input type="checkbox" id="class-bottle" checked><span><i class="fa-solid fa-bottle-water"></i> Bottle</span></label>
-                    <label class="fc"><input type="checkbox" id="class-chair" checked><span><i class="fa-solid fa-chair"></i> Chair</span></label>
-                    <label class="fc"><input type="checkbox" id="class-couch" checked><span><i class="fa-solid fa-couch"></i> Couch</span></label>
-                    <label class="fc"><input type="checkbox" id="class-potted_plant" checked><span><i class="fa-solid fa-seedling"></i> Plant</span></label>
-                    <label class="fc"><input type="checkbox" id="class-book" checked><span><i class="fa-solid fa-book"></i> Book</span></label>
-                    <label class="fc"><input type="checkbox" id="class-clock" checked><span><i class="fa-solid fa-clock"></i> Clock</span></label>
-                    <label class="fc"><input type="checkbox" id="class-scissors" checked><span><i class="fa-solid fa-scissors"></i> Scissors</span></label>
-                    <label class="fc"><input type="checkbox" id="class-backpack" checked><span><i class="fa-solid fa-backpack"></i> Backpack</span></label>
-                    <label class="fc"><input type="checkbox" id="class-umbrella" checked><span><i class="fa-solid fa-umbrella"></i> Umbrella</span></label>
-                    <label class="fc"><input type="checkbox" id="class-dog" checked><span><i class="fa-solid fa-dog"></i> Dog</span></label>
-                    <label class="fc"><input type="checkbox" id="class-cat" checked><span><i class="fa-solid fa-cat"></i> Cat</span></label>
-                    <label class="fc"><input type="checkbox" id="class-handbag" checked><span><i class="fa-solid fa-bag-shopping"></i> Handbag</span></label>
-                    <label class="fc"><input type="checkbox" id="class-tie" checked><span><i class="fa-solid fa-tie"></i> Tie</span></label>
-                    <label class="fc"><input type="checkbox" id="class-suitcase" checked><span><i class="fa-solid fa-suitcase"></i> Suitcase</span></label>
-                    <label class="fc"><input type="checkbox" id="class-bicycle" checked><span><i class="fa-solid fa-bicycle"></i> Bicycle</span></label>
-                    <label class="fc"><input type="checkbox" id="class-mouse" checked><span><i class="fa-solid fa-computer-mouse"></i> Mouse</span></label>
+
+                <!-- Instant Filter Search Input -->
+                <div class="filter-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="filter-search" placeholder="Search 170+ classes instantly...">
                 </div>
-                <div class="filter-actions">
-                    <button id="btn-select-all" class="hud-btn-sm">SELECT ALL</button>
-                    <button id="btn-select-none" class="hud-btn-sm">CLEAR ALL</button>
-                    <button id="btn-invert" class="hud-btn-sm hud-btn-sm-invert">INVERT</button>
+
+                <!-- Grouped / Scrollable Filter List -->
+                <div class="scrollable-filter-container">
+                    <div id="filter-grid" class="dynamic-filter-grid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Action Button Row -->
+                <div class="filter-actions-row">
+                    <button id="btn-select-all" class="hud-pill-btn"><i class="fa-solid fa-check-double"></i> ALL</button>
+                    <button id="btn-select-none" class="hud-pill-btn"><i class="fa-solid fa-xmark"></i> CLEAR</button>
+                    <button id="btn-invert" class="hud-pill-btn btn-invert-amber"><i class="fa-solid fa-rotate"></i> INVERT</button>
                 </div>
             </div>
 
-            <!-- Data Actions -->
-            <div class="param-col">
-                <span class="param-label">DATA ACTIONS</span>
-                <div class="data-action-row">
-                    <button id="btn-export-csv-new" class="hud-btn hud-btn-cyan">
-                        <i class="fa-solid fa-file-csv"></i> EXPORT CSV
+            <!-- DATA ACTIONS -->
+            <div class="control-col pt-10 border-top">
+                <span class="ctrl-title mb-8 block">SYSTEM DATA ARCHIVE</span>
+                <div class="action-buttons-grid">
+                    <button id="btn-export-csv-new" class="action-btn btn-glass-cyan">
+                        <i class="fa-solid fa-file-export"></i> EXPORT LOGS (.CSV)
                     </button>
-                    <button id="btn-clear-db-new" class="hud-btn hud-btn-red">
-                        <i class="fa-solid fa-trash"></i> CLEAR DB
+                    <button id="btn-clear-db-new" class="action-btn btn-glass-red">
+                        <i class="fa-solid fa-trash-can"></i> WIPE DATABASE
                     </button>
                 </div>
             </div>
+
         </div>
-
     </aside>
 </main>
 
-<!-- ===================== ANALYTICS + LOG ===================== -->
-<div class="bottom-section">
-
-    <!-- Detection Frequency Chart -->
-    <div class="bottom-card chart-card">
-        <div class="bcard-title">// DETECTION FREQUENCY</div>
-        <div class="chart-wrap">
+<!-- ===================== BOTTOM ANALYTICS & LOGS ===================== -->
+<section class="bottom-analytics">
+    <!-- Chart Card -->
+    <div class="analytics-card chart-card">
+        <div class="card-header-row">
+            <span class="card-title">// DETECTION DISTRIBUTION</span>
+            <span class="card-sub-title">Top targets frequency</span>
+        </div>
+        <div class="chart-container">
             <canvas id="analytics-chart"></canvas>
         </div>
     </div>
 
-    <!-- Event Log -->
-    <div class="bottom-card log-card">
-        <div class="bcard-title-row">
-            <span class="bcard-title">// SENSOR EVENT LOG</span>
-            <div class="log-search-box">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="log-search" placeholder="filter class...">
+    <!-- Table Logs Card -->
+    <div class="analytics-card log-card">
+        <div class="card-header-row flex-between">
+            <span class="card-title">// SYSTEM EVENT LOGGER</span>
+            <div class="table-search">
+                <i class="fa-solid fa-filter"></i>
+                <input type="text" id="log-search" placeholder="Filter logged class...">
             </div>
         </div>
-        <div class="log-table-wrap">
-            <table class="hud-table">
+        
+        <div class="table-scroll-wrapper">
+            <table class="dashboard-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>CLASS</th>
-                        <th>CONFIDENCE</th>
-                        <th>TIMESTAMP</th>
-                        <th>DEL</th>
+                        <th>INCIDENT ID</th>
+                        <th>CLASS CATEGORY</th>
+                        <th>CONFIDENCE SCORE</th>
+                        <th>TIMESTAMP (UTC)</th>
+                        <th>ACTION</th>
                     </tr>
                 </thead>
                 <tbody id="event-log-tbody">
                     <tr class="empty-row">
                         <td colspan="5">
-                            <i class="fa-solid fa-wave-square"></i>
-                            <p>Awaiting sensor data — start tracking to log events.</p>
+                            <div class="empty-state">
+                                <i class="fa-solid fa-signature"></i>
+                                <p>Awaiting surveillance detections... Enable sensor tracking above.</p>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
     </div>
+</section>
 
-</div>
+<!-- System hidden variables for tracking states (compatibility backup) -->
+<span id="val-fps-new" style="display:none"></span>
+<span id="val-latency-new" style="display:none"></span>
 
 <script src="/static/js/app.js"></script>
 </body>
