@@ -949,6 +949,126 @@ body {
 .btn-del:hover { color: var(--red); border-color: rgba(244,63,94,0.3); background: var(--red-dim); }
 
 /* ==========================================================================
+   STANDBY ANIMATED OVERLAY
+   ========================================================================== */
+
+/* Make vp-standby a positioning context for absolute overlays */
+.vp-standby {
+    position: absolute; inset: 0; z-index: 10;
+}
+
+.standby-grid-overlay {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0,229,200,0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,200,0.045) 1px, transparent 1px);
+    background-size: 24px 24px;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.standby-scan {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, var(--cyan) 50%, transparent 100%);
+    opacity: 0.35;
+    z-index: 2;
+    pointer-events: none;
+    animation: scan 4s linear infinite;
+}
+
+.standby-content {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+/* ==========================================================================
+   FILTER BADGE + LABEL GROUP
+   ========================================================================== */
+
+.filter-label-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-badge {
+    display: inline-flex;
+    align-items: center;
+    background: var(--cyan-dim);
+    color: var(--cyan);
+    border: 1px solid var(--border-hi);
+    border-radius: 99px;
+    font-size: 0.5rem;
+    padding: 2px 9px;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   INVERT BUTTON (amber variant of hud-btn-sm)
+   ========================================================================== */
+
+.hud-btn-sm-invert {
+    flex: 1;
+    padding: 5px 8px;
+    background: var(--amber-dim);
+    border: 1px solid rgba(245,158,11,0.35);
+    border-radius: var(--r);
+    font-family: var(--font);
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--amber);
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+}
+.hud-btn-sm-invert:hover {
+    border-color: var(--amber);
+    background: rgba(245,158,11,0.22);
+    box-shadow: 0 0 10px rgba(245,158,11,0.3);
+}
+
+/* ==========================================================================
+   ENHANCED GLOW ON CHECKED FILTER CHECKBOXES
+   ========================================================================== */
+
+.fc input:checked + span {
+    border-color: var(--border-hi);
+    color: var(--cyan);
+    background: var(--cyan-dim);
+    box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+/* ==========================================================================
+   SMOOTH TRANSITIONS ON ALL INTERACTIVE ELEMENTS
+   ========================================================================== */
+
+.fc span                { transition: all 0.3s ease-in-out; }
+.hud-btn                { transition: all 0.3s ease-in-out; }
+.hud-btn-sm             { transition: all 0.3s ease-in-out; }
+.diag-card              { transition: border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out; }
+.hud-select             { transition: border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out; }
+.power-slider           { transition: all 0.3s ease-in-out; }
+.power-slider::before   { transition: all 0.3s ease-in-out; }
+.hud-range              { transition: opacity 0.3s ease-in-out; }
+
+.diag-card:hover {
+    border-color: var(--border-mid);
+    box-shadow: 0 0 12px rgba(0,229,200,0.06);
+}
+
+/* ==========================================================================
    RESPONSIVE
    ========================================================================== */
 @media (max-width: 1050px) {

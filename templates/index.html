@@ -112,11 +112,15 @@
 
             <!-- Standby icon (shown when camera is off but model is loaded) -->
             <div class="vp-standby" id="vp-standby">
-                <div class="standby-icon">
-                    <i class="fa-regular fa-circle-pause"></i>
+                <div class="standby-grid-overlay"></div>
+                <div class="standby-scan"></div>
+                <div class="standby-content">
+                    <div class="standby-icon">
+                        <i class="fa-regular fa-circle-pause"></i>
+                    </div>
+                    <div class="standby-label">SENSOR STANDBY</div>
+                    <div class="standby-sub">Toggle Sensor Power to begin detection</div>
                 </div>
-                <div class="standby-label">SENSOR STANDBY</div>
-                <div class="standby-sub">Toggle Sensor Power to begin detection</div>
             </div>
 
             <!-- Detection Alert Banner -->
@@ -263,7 +267,10 @@
             <!-- Target Logic Filters -->
             <div class="param-col">
                 <div class="param-row-inline">
-                    <span class="param-label">TARGET LOGIC FILTERS</span>
+                    <div class="filter-label-group">
+                        <span class="param-label">TARGET LOGIC FILTERS</span>
+                        <span class="filter-badge" id="filter-active-badge">21 ACTIVE</span>
+                    </div>
                     <span class="param-desc">Toggle detection categories</span>
                 </div>
                 <div class="filter-grid">
@@ -283,10 +290,16 @@
                     <label class="fc"><input type="checkbox" id="class-umbrella" checked><span><i class="fa-solid fa-umbrella"></i> Umbrella</span></label>
                     <label class="fc"><input type="checkbox" id="class-dog" checked><span><i class="fa-solid fa-dog"></i> Dog</span></label>
                     <label class="fc"><input type="checkbox" id="class-cat" checked><span><i class="fa-solid fa-cat"></i> Cat</span></label>
+                    <label class="fc"><input type="checkbox" id="class-handbag" checked><span><i class="fa-solid fa-bag-shopping"></i> Handbag</span></label>
+                    <label class="fc"><input type="checkbox" id="class-tie" checked><span><i class="fa-solid fa-tie"></i> Tie</span></label>
+                    <label class="fc"><input type="checkbox" id="class-suitcase" checked><span><i class="fa-solid fa-suitcase"></i> Suitcase</span></label>
+                    <label class="fc"><input type="checkbox" id="class-bicycle" checked><span><i class="fa-solid fa-bicycle"></i> Bicycle</span></label>
+                    <label class="fc"><input type="checkbox" id="class-mouse" checked><span><i class="fa-solid fa-computer-mouse"></i> Mouse</span></label>
                 </div>
                 <div class="filter-actions">
                     <button id="btn-select-all" class="hud-btn-sm">SELECT ALL</button>
                     <button id="btn-select-none" class="hud-btn-sm">CLEAR ALL</button>
+                    <button id="btn-invert" class="hud-btn-sm hud-btn-sm-invert">INVERT</button>
                 </div>
             </div>
 

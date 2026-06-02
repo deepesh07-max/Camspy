@@ -54,6 +54,8 @@ document.addEventListener("DOMContentLoaded", () => {
         // Filter buttons
         btnSelectAll:   $("btn-select-all"),
         btnSelectNone:  $("btn-select-none"),
+        btnInvert:      $("btn-invert"),
+        filterBadge:    $("filter-active-badge"),
 
         // Data actions
         btnExportCsv:   $("btn-export-csv-new"),
@@ -70,7 +72,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const TARGET_KEYS = [
         "person","cell_phone","laptop","keyboard","cup","bottle",
         "chair","couch","potted_plant","book","clock","scissors",
-        "backpack","umbrella","dog","cat"
+        "backpack","umbrella","dog","cat",
+        "handbag","tie","suitcase","bicycle","mouse"
     ];
 
     const state = {
@@ -680,11 +683,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function updateAlarmTargetDiag() {
-        if (!el.diagAlarmTarget) return;
-        el.diagAlarmTarget.textContent =
-            state.targets.size === TARGET_KEYS.length ? "ALL" :
-            state.targets.size === 0 ? "NONE" :
-            `${state.targets.size} CLASS`;
+        if (el.diagAlarmTarget) {
+            el.diagAlarmTarget.textContent =
+                state.targets.size === TARGET_KEYS.length ? "ALL" :
+                state.targets.size === 0 ? "NONE" :
+                `${state.targets.size} CLASS`;
+        }
+        if (el.filterBadge) {
+            el.filterBadge.textContent = state.targets.size + " ACTIVE";
+        }
     }
 
     if (el.btnSelectAll) {
@@ -701,6 +708,22 @@ document.addEventListener("DOMContentLoaded", () => {
             TARGET_KEYS.forEach(k => {
                 const b = $(`class-${k}`);
                 if (b) { b.checked = false; state.targets.delete(k); }
+            });
+            updateAlarmTargetDiag();
+        });
+    }
+    if (el.btnInvert) {
+        el.btnInvert.addEventListener("click", () => {
+            TARGET_KEYS.forEach(k => {
+                const b = $(`class-${k}`);
+                if (!b) return;
+                if (b.checked) {
+                    b.checked = false;
+                    state.targets.delete(k);
+                } else {
+                    b.checked = true;
+                    state.targets.add(k);
+                }
             });
             updateAlarmTargetDiag();
         });
