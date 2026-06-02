@@ -361,11 +361,28 @@
 <section class="bottom-analytics">
     <!-- Chart Card -->
     <div class="analytics-card chart-card">
-        <div class="card-header-row">
-            <span class="card-title">// DETECTION DISTRIBUTION</span>
-            <span class="card-sub-title">Top targets frequency</span>
+        <div class="card-header-row flex-between">
+            <div>
+                <span class="card-title">// DETECTION DISTRIBUTION</span>
+                <span class="card-sub-title">Rolling time-window &amp; top classes</span>
+            </div>
+            <div class="chart-tabs" id="chart-tabs">
+                <button class="chart-tab" data-window="30">30s</button>
+                <button class="chart-tab active" data-window="60">1m</button>
+                <button class="chart-tab" data-window="300">5m</button>
+                <button class="chart-tab" data-window="0">All</button>
+            </div>
         </div>
-        <div class="chart-container">
+        <!-- Rolling time-window line chart -->
+        <div class="chart-container" style="height:130px; margin-bottom:0;">
+            <canvas id="timeline-chart"></canvas>
+        </div>
+        <!-- Sub-header for bar chart -->
+        <div class="chart-section-divider">
+            <span class="chart-sub-label">TOP CLASSES (ALL-TIME)</span>
+        </div>
+        <!-- All-time frequency bar chart -->
+        <div class="chart-container" style="height:90px;">
             <canvas id="analytics-chart"></canvas>
         </div>
     </div>

@@ -161,6 +161,9 @@ document.addEventListener("DOMContentLoaded", () => {
         prevSet:        new Set(),
 
         chart:          null,
+        timelineChart:  null,
+        detectionBuffer: [],   // [{ts: ms, label: str}]  – live rolling store
+        activeWindow:   60,    // seconds (0 = all-time)
         logs:           [],
     };
 
@@ -386,9 +389,119 @@ document.addEventListener("DOMContentLoaded", () => {
         const freq = {};
         logs.forEach(l => { const k = l.label.toUpperCase(); freq[k] = (freq[k]||0)+1; });
         const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0,8);
-        state.chart.data.labels             = sorted.map(x => x[0]);
+        state.chart.data.labels            = sorted.map(x => x[0]);
         state.chart.data.datasets[0].data  = sorted.map(x => x[1]);
         state.chart.update();
+    }
+
+    /* -------------------------------------------------------
+       ROLLING TIME-WINDOW CHART
+     ------------------------------------------------------- */
+    function initTimelineChart() {
+        const c = $("timeline-chart");
+        if (!c) return;
+        state.timelineChart = new Chart(c, {
+            type: "line",
+            data: {
+                labels: [],
+                datasets: [{
+                    label: "Detections",
+                    data: [],
+                    borderColor: "rgba(0, 255, 213, 0.85)",
+                    backgroundColor: "rgba(0, 255, 213, 0.07)",
+                    borderWidth: 1.8,
+                    fill: true,
+                    tension: 0.45,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    pointBackgroundColor: "rgba(0, 255, 213, 0.9)",
+                    pointBorderWidth: 0,
+                    pointHoverBackgroundColor: "#fff"
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 250, easing: "easeOutQuart" },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "#0e111a",
+                        titleFont: { family: "Inter", size: 9, weight: "700" },
+                        bodyFont:  { family: "Inter", size: 9 },
+                        borderColor: "rgba(0, 255, 213, 0.3)",
+                        borderWidth: 1,
+                        callbacks: {
+                            label: ctx => ` ${ctx.parsed.y} detection${ctx.parsed.y !== 1 ? "s" : ""}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: "rgba(255,255,255,0.025)" },
+                        ticks: {
+                            color: "#475569",
+                            font: { family: "Inter", size: 8, weight: "600" },
+                            maxRotation: 0
+                        }
+                    },
+                    y: {
+                        grid: { color: "rgba(255,255,255,0.025)" },
+                        beginAtZero: true,
+                        min: 0,
+                        ticks: {
+                            color: "#475569",
+                            font: { family: "Inter", size: 8, weight: "600" },
+                            stepSize: 1,
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function refreshTimelineChart() {
+        if (!state.timelineChart) return;
+        const now       = Date.now();
+        const windowSec = state.activeWindow;
+        const windowMs  = windowSec === 0 ? Infinity : windowSec * 1000;
+
+        // Choose bucket granularity based on selected window
+        let bucketSec, numBuckets;
+        if (windowSec === 0) {
+            // All-time: 10 dynamic buckets across the full span
+            numBuckets = 10;
+            const oldest  = state.detectionBuffer.length > 0 ? state.detectionBuffer[0].ts : now;
+            const spanSec = Math.max(60, (now - oldest) / 1000);
+            bucketSec = Math.ceil(spanSec / numBuckets);
+        } else if (windowSec <= 30)  { bucketSec = 5;  numBuckets = 6;  }
+        else if (windowSec <= 60)   { bucketSec = 5;  numBuckets = 12; }
+        else                         { bucketSec = 20; numBuckets = 15; }
+
+        // Purge entries outside the finite window (keep a tiny buffer for smooth edges)
+        if (windowMs !== Infinity) {
+            const cutoff = now - windowMs - bucketSec * 1000;
+            state.detectionBuffer = state.detectionBuffer.filter(d => d.ts >= cutoff);
+        }
+
+        // Build bucket counts and labels (newest bucket = rightmost = "now")
+        const buckets = new Array(numBuckets).fill(0);
+        const labels  = [];
+        for (let i = 0; i < numBuckets; i++) {
+            const secAgo = (numBuckets - 1 - i) * bucketSec;
+            labels.push(secAgo === 0 ? "now" : `-${secAgo}s`);
+        }
+
+        state.detectionBuffer.forEach(d => {
+            const ageSec     = (now - d.ts) / 1000;
+            const bucketIdx  = numBuckets - 1 - Math.floor(ageSec / bucketSec);
+            if (bucketIdx >= 0 && bucketIdx < numBuckets) buckets[bucketIdx]++;
+        });
+
+        state.timelineChart.data.labels            = labels;
+        state.timelineChart.data.datasets[0].data  = buckets;
+        state.timelineChart.update("none"); // skip animation for smooth rolling feel
     }
 
     /* -------------------------------------------------------
@@ -685,6 +798,10 @@ document.addEventListener("DOMContentLoaded", () => {
             beep();
 
             const now = Date.now();
+            // Push every hit into the rolling detection buffer (for the timeline chart)
+            hits.forEach(h => { state.detectionBuffer.push({ ts: now, label: h.class }); });
+            refreshTimelineChart();
+
             hits.forEach(h => {
                 const last = state.lastLogged.get(h.class) || 0;
                 if (now - last > state.cooldown || !state.prevSet.has(h.class)) {
@@ -918,10 +1035,24 @@ document.addEventListener("DOMContentLoaded", () => {
      ------------------------------------------------------- */
     async function init() {
         initChart();
+        initTimelineChart();
         renderFilters();
         updateAlarmTargetDiag();
         await loadLogs();
         await populateCamList();
+
+        // Wire up time-window tab buttons
+        document.querySelectorAll(".chart-tab").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".chart-tab").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                state.activeWindow = parseInt(btn.dataset.window, 10);
+                refreshTimelineChart();
+            });
+        });
+
+        // Rolling 2-second tick — makes the chart scroll forward even with no new events
+        setInterval(refreshTimelineChart, 2000);
 
         showLoading("INITIALIZING NEURAL NET", "Fetching COCO-SSD weights from node...");
 

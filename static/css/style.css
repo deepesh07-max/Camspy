@@ -1346,9 +1346,71 @@ body {
 }
 
 .chart-container {
-    height: 180px;
+    height: 180px; /* overridden per-instance via inline style */
     position: relative;
 }
+
+/* ── Rolling-window chart tab pills ─────────────────────── */
+.chart-tabs {
+    display: flex;
+    gap: 3px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border-glass);
+    border-radius: 7px;
+    padding: 3px;
+}
+
+.chart-tab {
+    background: transparent;
+    border: none;
+    color: #475569;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 4px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
+}
+
+.chart-tab:hover {
+    background: rgba(0, 255, 213, 0.08);
+    color: var(--cyan);
+}
+
+.chart-tab.active {
+    background: rgba(0, 255, 213, 0.14);
+    color: var(--cyan);
+    box-shadow: 0 0 8px rgba(0, 255, 213, 0.18);
+}
+
+/* ── Divider between the two charts ─────────────────────── */
+.chart-section-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 6px;
+}
+
+.chart-section-divider::before,
+.chart-section-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-glass);
+}
+
+.chart-sub-label {
+    font-family: var(--font-mono);
+    font-size: 0.52rem;
+    font-weight: 700;
+    color: #334155;
+    letter-spacing: 0.15em;
+    white-space: nowrap;
+}
+
 
 /* Event log table details */
 .table-scroll-wrapper {
