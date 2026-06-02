@@ -719,8 +719,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (el.recBadge)   el.recBadge.classList.remove("active");
         if (el.alertBanner) el.alertBanner.classList.add("hide");
         if (el.vpStandby) el.vpStandby.classList.remove("hide");
-        if (el.fpsDisplay)     el.fpsDisplay.textContent     = "0 FPS";
-        if (el.latencyDisplay) el.latencyDisplay.textContent = "0 ms";
+        if (el.fpsDisplay)     el.fpsDisplay.textContent     = "– FPS";
+        if (el.latencyDisplay) el.latencyDisplay.textContent = "– ms";
         if (el.diagSensorState) {
             el.diagSensorState.textContent = "STANDBY";
             el.diagSensorState.className   = "m-value text-amber";
