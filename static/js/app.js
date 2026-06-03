@@ -1195,50 +1195,57 @@ document.addEventListener("DOMContentLoaded", () => {
             state.streams = [mainStream];
             el.webcams[0].srcObject = mainStream;
 
-            // Query other physical cameras
-            try {
-                const devs = await navigator.mediaDevices.enumerateDevices();
-                const cams = devs.filter(d => {
-                    if (d.kind !== "videoinput") return false;
-                    if (d.deviceId === "" || d.deviceId === state.deviceId) return false;
-                    
-                    const label = (d.label || "").toLowerCase();
-                    // Exclude phone, virtual, and linkage devices to prevent OS prompt popup
-                    const isPhoneOrVirtual = /phone|android|a35|a55|galaxy|iphone|pixel|continuity|virtual|link to windows|epoccam/i.test(label);
-                    return !isPhoneOrVirtual;
-                });
+            // Query secondary physical cameras in the background without blocking main feed startup
+            (async () => {
+                try {
+                    const devs = await navigator.mediaDevices.enumerateDevices();
+                    const cams = devs.filter(d => {
+                        if (d.kind !== "videoinput") return false;
+                        if (d.deviceId === "" || d.deviceId === state.deviceId) return false;
+                        
+                        const label = (d.label || "").toLowerCase();
+                        // Exclude phone, virtual, and linkage devices to prevent OS prompt popup
+                        const isPhoneOrVirtual = /phone|android|a35|a55|galaxy|iphone|pixel|continuity|virtual|link to windows|epoccam/i.test(label);
+                        return !isPhoneOrVirtual;
+                    });
 
-                for (let i = 1; i < 4; i++) {
-                    if (cams[i - 1]) {
-                        try {
-                            const secStream = await navigator.mediaDevices.getUserMedia({
-                                video: { deviceId: { exact: cams[i - 1].deviceId }, width: { ideal: 640 }, height: { ideal: 360 } },
-                                audio: false
-                            });
-                            state.streams.push(secStream);
-                            el.webcams[i].srcObject = secStream;
-                        } catch (secErr) {
-                            console.warn(`Could not start secondary camera slot ${i}:`, secErr);
+                    for (let i = 1; i < 4; i++) {
+                        if (cams[i - 1]) {
+                            try {
+                                const secStream = await navigator.mediaDevices.getUserMedia({
+                                    video: { deviceId: { exact: cams[i - 1].deviceId }, width: { ideal: 640 }, height: { ideal: 360 } },
+                                    audio: false
+                                });
+                                state.streams.push(secStream);
+                                el.webcams[i].srcObject = secStream;
+                                if (state.active) {
+                                    try {
+                                        await el.webcams[i].play();
+                                    } catch (_) {}
+                                }
+                            } catch (secErr) {
+                                console.warn(`Could not start secondary camera slot ${i}:`, secErr);
+                                el.webcams[i].srcObject = mainStream;
+                            }
+                        } else {
                             el.webcams[i].srcObject = mainStream;
                         }
-                    } else {
+                    }
+                } catch (enumErr) {
+                    console.warn("Could not enumerate device inputs for secondary streams:", enumErr);
+                    for (let i = 1; i < 4; i++) {
                         el.webcams[i].srcObject = mainStream;
                     }
                 }
-            } catch (enumErr) {
-                console.warn("Could not enumerate device inputs for secondary streams:", enumErr);
-                for (let i = 1; i < 4; i++) {
-                    el.webcams[i].srcObject = mainStream;
-                }
-            }
+            })();
 
             el.webcams[0].onloadedmetadata = async () => {
                 clearTimeout(_camTimer);
                 
-                // Play all feeds
+                // Play main feed (and any already loaded secondary feeds)
                 for (let i = 0; i < 4; i++) {
                     try {
-                        if (el.webcams[i].srcObject) {
+                        if (el.webcams[i].srcObject && el.webcams[i].paused) {
                             await el.webcams[i].play();
                         }
                     } catch (playErr) {
