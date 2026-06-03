@@ -612,6 +612,12 @@ body {
     border-color: rgba(245, 158, 11, 0.3);
     box-shadow: var(--amber-glow);
 }
+#tool-heatmap.active {
+    background: rgba(244, 63, 94, 0.15) !important;
+    color: #f43f5e !important;
+    border-color: rgba(244, 63, 94, 0.4) !important;
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.4) !important;
+}
 .draw-tool-btn.btn-clear-draw:hover {
     color: var(--red);
     background: var(--red-dim);

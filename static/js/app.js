@@ -62,7 +62,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Data actions
         btnExportCsv:   $("btn-export-csv-new"),
+        btnExportPdf:   $("btn-export-pdf"),
         btnClearDb:     $("btn-clear-db-new"),
+        toolHeatmap:    $("tool-heatmap"),
 
         // Log table
         logSearch:      $("log-search"),
@@ -293,9 +295,46 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Per-camera IoU trackers — independent ID sequences
         trackers: [ new Tracker(), new Tracker(), new Tracker(), new Tracker() ],
+
+        // Heatmap state
+        heatmapEnabled:     false,
+        heatmapAlpha:       0.6,
+        heatmaps:           [null, null, null, null],
+
+        // Session tracking
+        sessionActive:      false,
+        sessionStartTime:   null,
+        sessionDetections:  [],
     };
 
     const ctxs = el.canvases.map(c => c.getContext("2d"));
+
+    // Initialize heatmap offscreen canvases
+    for (let i = 0; i < 4; i++) {
+        const offCanvas = document.createElement("canvas");
+        offCanvas.width = 320;
+        offCanvas.height = 180;
+        state.heatmaps[i] = offCanvas;
+    }
+
+    // Precompute 256px gradient palette for heatmap color mapping
+    const heatmapPalette = new Uint8ClampedArray(256 * 4);
+    (() => {
+        const paletteCanvas = document.createElement("canvas");
+        paletteCanvas.width = 1;
+        paletteCanvas.height = 256;
+        const pCtx = paletteCanvas.getContext("2d");
+        const grad = pCtx.createLinearGradient(0, 0, 0, 256);
+        grad.addColorStop(0.00, "rgba(0, 0, 0, 0)");
+        grad.addColorStop(0.20, "rgba(0, 255, 213, 0.2)"); // Cyan glow
+        grad.addColorStop(0.50, "rgba(16, 185, 129, 0.5)"); // Emerald green
+        grad.addColorStop(0.75, "rgba(245, 158, 11, 0.75)"); // Amber orange
+        grad.addColorStop(1.00, "rgba(244, 63, 94, 0.95)");  // Deep Rose Red
+        pCtx.fillStyle = grad;
+        pCtx.fillRect(0, 0, 1, 256);
+        const imgData = pCtx.getImageData(0, 0, 1, 256);
+        heatmapPalette.set(imgData.data);
+    })();
 
     /* -------------------------------------------------------
        CLOCK
@@ -461,6 +500,298 @@ document.addEventListener("DOMContentLoaded", () => {
             osc.stop(state.audioCtx.currentTime + 0.25);
             osc.onended = () => { state.ringing = false; };
         } catch(e) { state.ringing = false; }
+    }
+
+    /* -------------------------------------------------------
+       HEATMAP & PDF SUMMARY REPORT HELPERS
+     ------------------------------------------------------- */
+    function recordHeatmapHit(camIndex, bbox, canvas) {
+        const offCanvas = state.heatmaps[camIndex];
+        if (!offCanvas) return;
+        const offCtx = offCanvas.getContext("2d");
+        
+        const [bx, by, bw, bh] = bbox;
+        const scaleX = 320 / canvas.width;
+        const scaleY = 180 / canvas.height;
+        
+        const cx = (bx + bw / 2) * scaleX;
+        const cy = (by + bh / 2) * scaleY;
+        
+        const radius = 25;
+        const grad = offCtx.createRadialGradient(cx, cy, 2, cx, cy, radius);
+        grad.addColorStop(0, "rgba(0, 0, 0, 0.12)");
+        grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        
+        offCtx.fillStyle = grad;
+        offCtx.beginPath();
+        offCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+        offCtx.fill();
+    }
+
+    function drawHeatmapOverlay(camIndex) {
+        const canvas = el.canvases[camIndex];
+        const ctx = ctxs[camIndex];
+        const offCanvas = state.heatmaps[camIndex];
+        if (!offCanvas) return;
+        
+        const offCtx = offCanvas.getContext("2d");
+        const imgData = offCtx.getImageData(0, 0, 320, 180);
+        const data = imgData.data;
+        
+        if (!state.colorCanvas) {
+            state.colorCanvas = document.createElement("canvas");
+            state.colorCanvas.width = 320;
+            state.colorCanvas.height = 180;
+        }
+        const colCtx = state.colorCanvas.getContext("2d");
+        const colImgData = colCtx.createImageData(320, 180);
+        const colData = colImgData.data;
+        
+        for (let i = 0; i < data.length; i += 4) {
+            const alpha = data[i + 3];
+            if (alpha > 0) {
+                const offset = alpha * 4;
+                colData[i]     = heatmapPalette[offset];
+                colData[i + 1] = heatmapPalette[offset + 1];
+                colData[i + 2] = heatmapPalette[offset + 2];
+                colData[i + 3] = heatmapPalette[offset + 3] * state.heatmapAlpha;
+            } else {
+                colData[i + 3] = 0;
+            }
+        }
+        
+        colCtx.putImageData(colImgData, 0, 0);
+        
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(state.colorCanvas, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
+
+    function generatePDFReport() {
+        if (!window.jspdf) {
+            console.error("jsPDF library not loaded");
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+            orientation: "p",
+            unit: "mm",
+            format: "a4"
+        });
+
+        const detections = state.sessionDetections;
+        const totalDetections = detections.length;
+
+        const startTime = state.sessionStartTime || new Date();
+        const endTime = state.sessionActive ? new Date() : (state.sessionEndTime || new Date());
+        const durationSec = Math.round((endTime - startTime) / 1000);
+        const durationStr = `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`;
+
+        const classCounts = {};
+        detections.forEach(d => {
+            const lbl = d.label.replace(/_/g, " ").toUpperCase();
+            classCounts[lbl] = (classCounts[lbl] || 0) + 1;
+        });
+
+        const sortedClasses = Object.entries(classCounts).sort((a, b) => b[1] - a[1]);
+
+        const timeBuckets = {};
+        detections.forEach(d => {
+            const timeVal = new Date(d.ts);
+            const hour = String(timeVal.getHours()).padStart(2, "0");
+            const minuteTen = Math.floor(timeVal.getMinutes() / 10) * 10;
+            const minuteTenStr = String(minuteTen).padStart(2, "0");
+            
+            let endMinute = minuteTen + 10;
+            let endHour = hour;
+            if (endMinute === 60) {
+                endMinute = 0;
+                let nextHr = (timeVal.getHours() + 1) % 24;
+                endHour = String(nextHr).padStart(2, "0");
+            }
+            const endMinStr = String(endMinute).padStart(2, "0");
+
+            const key = `${hour}:${minuteTenStr} - ${endHour}:${endMinStr}`;
+            timeBuckets[key] = (timeBuckets[key] || 0) + 1;
+        });
+
+        let peakTime = "N/A";
+        let maxHits = 0;
+        Object.entries(timeBuckets).forEach(([bucket, hits]) => {
+            if (hits > maxHits) {
+                maxHits = hits;
+                peakTime = `${bucket} (${hits} detections)`;
+            }
+        });
+
+        // PDF Styling: Dark theme
+        doc.setFillColor(11, 15, 29);
+        doc.rect(0, 0, 210, 297, "F");
+
+        doc.setDrawColor(0, 255, 213);
+        doc.setLineWidth(1.5);
+        doc.line(15, 15, 195, 15);
+
+        doc.setTextColor(0, 255, 213);
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(22);
+        doc.text("CAMSPY.IO // SESSION SUMMARY", 15, 28);
+
+        doc.setTextColor(100, 116, 139);
+        doc.setFont("Helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text("AI SURVEILLANCE NODE INTEL REPORT", 15, 33);
+
+        doc.setFillColor(17, 24, 39);
+        doc.rect(15, 38, 180, 26, "F");
+        doc.setDrawColor(31, 41, 55);
+        doc.setLineWidth(0.5);
+        doc.rect(15, 38, 180, 26);
+
+        doc.setTextColor(245, 158, 11);
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("START TIME:", 20, 44);
+        doc.text("END TIME:", 20, 50);
+        doc.text("DURATION:", 20, 56);
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("Helvetica", "normal");
+        doc.text(startTime.toLocaleString(), 48, 44);
+        doc.text(endTime.toLocaleString(), 48, 50);
+        doc.text(durationStr, 48, 56);
+
+        doc.setTextColor(245, 158, 11);
+        doc.setFont("Helvetica", "bold");
+        doc.text("TOTAL EVENTS:", 120, 44);
+        doc.text("PEAK INTERVAL:", 120, 50);
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("Helvetica", "normal");
+        doc.text(String(totalDetections), 152, 44);
+        doc.text(peakTime, 152, 50);
+
+        doc.setTextColor(0, 255, 213);
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text("CLASS BREAKDOWN FREQUENCY", 15, 78);
+
+        doc.setFillColor(17, 24, 39);
+        doc.rect(15, 83, 85, 95, "F");
+        doc.rect(15, 83, 85, 95);
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        let yPos = 92;
+        doc.setFont("Helvetica", "bold");
+        doc.text("CATEGORY", 20, yPos);
+        doc.text("COUNT", 80, yPos);
+        
+        doc.setDrawColor(55, 65, 81);
+        doc.setLineWidth(0.3);
+        doc.line(17, yPos + 2, 97, yPos + 2);
+        
+        yPos += 8;
+        doc.setFont("Helvetica", "normal");
+
+        if (sortedClasses.length === 0) {
+            doc.setTextColor(100, 116, 139);
+            doc.text("No detections recorded this session.", 20, yPos);
+        } else {
+            sortedClasses.slice(0, 10).forEach(([lbl, count]) => {
+                doc.setTextColor(255, 255, 255);
+                doc.text(lbl, 20, yPos);
+                doc.setTextColor(0, 255, 213);
+                doc.text(String(count), 80, yPos);
+                
+                doc.line(17, yPos + 2, 97, yPos + 2);
+                yPos += 8;
+            });
+        }
+
+        if (totalDetections > 0) {
+            const tempChartCanvas = document.createElement("canvas");
+            tempChartCanvas.width = 300;
+            tempChartCanvas.height = 300;
+            tempChartCanvas.style.display = "none";
+            document.body.appendChild(tempChartCanvas);
+
+            const labels = sortedClasses.slice(0, 6).map(x => x[0]);
+            const counts = sortedClasses.slice(0, 6).map(x => x[1]);
+
+            if (sortedClasses.length > 6) {
+                labels.push("OTHER");
+                const otherSum = sortedClasses.slice(6).reduce((sum, x) => sum + x[1], 0);
+                counts.push(otherSum);
+            }
+
+            const pieColors = [
+                "#00ffd5",
+                "#f59e0b",
+                "#f43f5e",
+                "#10b981",
+                "#3b82f6",
+                "#a855f7",
+                "#64748b"
+            ];
+
+            const tempChart = new Chart(tempChartCanvas.getContext("2d"), {
+                type: "pie",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: pieColors.slice(0, labels.length),
+                        borderColor: "#111827",
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    animation: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: "#ffffff",
+                                font: { size: 12, family: "Helvetica" }
+                            }
+                        }
+                    }
+                }
+            });
+
+            try {
+                const imgDataUrl = tempChartCanvas.toDataURL("image/png");
+                doc.setTextColor(0, 255, 213);
+                doc.setFont("Helvetica", "bold");
+                doc.setFontSize(12);
+                doc.text("DETECTION RATIO PIE CHART", 110, 78);
+
+                doc.addImage(imgDataUrl, "PNG", 110, 83, 85, 85);
+            } catch (err) {
+                console.error("Failed to render Chart.js image into PDF:", err);
+            }
+
+            tempChart.destroy();
+            tempChartCanvas.remove();
+        } else {
+            doc.setTextColor(100, 116, 139);
+            doc.text("No graphical breakdown available.", 115, 120);
+        }
+
+        doc.setDrawColor(31, 41, 55);
+        doc.setLineWidth(0.5);
+        doc.line(15, 275, 195, 275);
+
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(8);
+        doc.setFont("Helvetica", "normal");
+        doc.text("CAMSPY AUTOMATED NODE TELEMETRY SYSTEM", 15, 282);
+        doc.text(`REPORT GENERATED: ${new Date().toLocaleString()}`, 130, 282);
+
+        doc.save(`camspy_session_report_${Date.now()}.pdf`);
     }
 
     /* -------------------------------------------------------
@@ -815,6 +1146,18 @@ document.addEventListener("DOMContentLoaded", () => {
     let _camTimer = null;
 
     async function startCamera() {
+        // Initialize session tracking
+        state.sessionActive = true;
+        state.sessionStartTime = new Date();
+        state.sessionDetections = [];
+        
+        // Clear heatmap canvases
+        state.heatmaps.forEach(canvas => {
+            if (canvas) {
+                canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+
         initAudio();
         showLoading("CONNECTING SENSOR FEED", "Tuning secure grid pipelines...");
 
@@ -925,6 +1268,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function stopCamera() {
+        // End session and generate PDF report if detections occurred
+        if (state.sessionActive) {
+            state.sessionActive = false;
+            state.sessionEndTime = new Date();
+            if (state.sessionDetections.length > 0) {
+                generatePDFReport();
+            }
+        }
+
         if (state.streams) {
             state.streams.forEach(s => {
                 if (s) s.getTracks().forEach(t => t.stop());
@@ -1109,6 +1461,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const ctx = ctxs[camIndex];
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        if (state.heatmapEnabled) {
+            drawHeatmapOverlay(camIndex);
+        }
+
         const hits = [];
         const curr = new Set();
 
@@ -1122,6 +1478,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
         });
+
+        // Record heatmap hits and session detections
+        if (state.active) {
+            hits.forEach(h => {
+                recordHeatmapHit(camIndex, h.bbox, canvas);
+                if (state.sessionActive) {
+                    state.sessionDetections.push({
+                        ts: Date.now(),
+                        label: h.class,
+                        score: h.score,
+                        camIndex: camIndex
+                    });
+                }
+            });
+        }
 
         // Trigger alarms and database sync only for triggered hits
         const activeAlerts = hits.filter(h => h.triggered);
@@ -1755,6 +2126,17 @@ document.addEventListener("DOMContentLoaded", () => {
         el.btnExportCsv.addEventListener("click", () => { window.location.href = "/api/export"; });
     }
 
+    // Export PDF Session Summary Report
+    if (el.btnExportPdf) {
+        el.btnExportPdf.addEventListener("click", () => {
+            if (state.sessionDetections.length === 0) {
+                alert("No detections recorded in this active session to generate report.");
+                return;
+            }
+            generatePDFReport();
+        });
+    }
+
     // Wipe logs database
     if (el.btnClearDb) {
         el.btnClearDb.addEventListener("click", clearAll);
@@ -1914,6 +2296,21 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (toolZone) {
             toolZone.addEventListener("click", () => setActiveTool("zone", toolZone));
+        }
+        if (el.toolHeatmap) {
+            el.toolHeatmap.addEventListener("click", () => {
+                state.heatmapEnabled = !state.heatmapEnabled;
+                if (state.heatmapEnabled) {
+                    el.toolHeatmap.classList.add("active");
+                } else {
+                    el.toolHeatmap.classList.remove("active");
+                }
+                
+                // Force canvas redrawing to display/hide heatmap instantly
+                for (let i = 0; i < 4; i++) {
+                    processDetections([], i);
+                }
+            });
         }
         if (toolClear) {
             toolClear.addEventListener("click", () => {

@@ -21,6 +21,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
 
+    <!-- jsPDF for summary report -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -204,6 +207,9 @@
                     </button>
                     <button class="draw-tool-btn" id="tool-zone" title="Draw Exclusion Zone">
                         <i class="fa-solid fa-vector-square"></i>
+                    </button>
+                    <button class="draw-tool-btn" id="tool-heatmap" title="Toggle Heatmap Overlay">
+                        <i class="fa-solid fa-fire"></i>
                     </button>
                     <button class="draw-tool-btn btn-clear-draw" id="tool-clear" title="Clear All Boundaries">
                         <i class="fa-solid fa-eraser"></i>
@@ -416,6 +422,9 @@
                 <div class="action-buttons-grid">
                     <button id="btn-export-csv-new" class="action-btn btn-glass-cyan">
                         <i class="fa-solid fa-file-export"></i> EXPORT LOGS (.CSV)
+                    </button>
+                    <button id="btn-export-pdf" class="action-btn btn-glass-cyan">
+                        <i class="fa-solid fa-file-pdf"></i> EXPORT REPORT (PDF)
                     </button>
                     <button id="btn-clear-db-new" class="action-btn btn-glass-red">
                         <i class="fa-solid fa-trash-can"></i> WIPE DATABASE
