@@ -26,8 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
         alertBanner:    $("detection-alert-banner"),
         alertText:      $("alert-banner-text"),
         recBadge:       $("rec-badge"),
-        webcam:         $("webcam"),
-        canvas:         $("hud-overlay"),
+        webcams:        [ $("webcam-1"), $("webcam-2"), $("webcam-3"), $("webcam-4") ],
+        canvases:       [ $("hud-overlay-1"), $("hud-overlay-2"), $("hud-overlay-3"), $("hud-overlay-4") ],
 
         // Stats strip
         fpsDisplay:     $("fps-display"),
@@ -167,9 +167,22 @@ document.addEventListener("DOMContentLoaded", () => {
         detectionBuffer: [],   // [{ts: ms, label: str}]  – live rolling store
         activeWindow:   60,    // seconds (0 = all-time)
         logs:           [],
+
+        // Multi-camera and Drawing state
+        layoutMode:     "single", // "single" | "grid"
+        drawMode:       "none",   // "none" | "tripwire" | "zone"
+        streams:        [],       // array of active MediaStreams
+        boundaries: [
+            { tripwires: [], zones: [] },
+            { tripwires: [], zones: [] },
+            { tripwires: [], zones: [] },
+            { tripwires: [], zones: [] }
+        ],
+        tempPoint:      null,     // { x, y } (normalized) during line drawing
+        activeCamIndex: 0,
     };
 
-    const ctx2d = el.canvas.getContext("2d");
+    const ctxs = el.canvases.map(c => c.getContext("2d"));
 
     /* -------------------------------------------------------
        CLOCK
@@ -658,7 +671,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function startCamera() {
         initAudio();
-        showLoading("CONNECTING SENSOR FEED", "Tuning secure pipeline stream...");
+        showLoading("CONNECTING SENSOR FEED", "Tuning secure grid pipelines...");
 
         if (_camTimer) clearTimeout(_camTimer);
         _camTimer = setTimeout(() => {
@@ -675,13 +688,13 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         try {
-            let stream;
+            let mainStream;
             try {
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                mainStream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch (firstErr) {
                 if (state.deviceId) {
                     console.warn("Target webcam stream busy. Toggling generic fallback...", firstErr);
-                    stream = await navigator.mediaDevices.getUserMedia({
+                    mainStream = await navigator.mediaDevices.getUserMedia({
                         video: { width: { ideal: 1280 }, height: { ideal: 720 } },
                         audio: false
                     });
@@ -690,16 +703,56 @@ document.addEventListener("DOMContentLoaded", () => {
                     throw firstErr;
                 }
             }
-            el.webcam.srcObject = stream;
 
-            el.webcam.onloadedmetadata = async () => {
+            state.streams = [mainStream];
+            el.webcams[0].srcObject = mainStream;
+
+            // Query other physical cameras
+            try {
+                const devs = await navigator.mediaDevices.enumerateDevices();
+                const cams = devs.filter(d => d.kind === "videoinput" && d.deviceId !== state.deviceId && d.deviceId !== "");
+
+                for (let i = 1; i < 4; i++) {
+                    if (cams[i - 1]) {
+                        try {
+                            const secStream = await navigator.mediaDevices.getUserMedia({
+                                video: { deviceId: { exact: cams[i - 1].deviceId }, width: { ideal: 640 }, height: { ideal: 360 } },
+                                audio: false
+                            });
+                            state.streams.push(secStream);
+                            el.webcams[i].srcObject = secStream;
+                        } catch (secErr) {
+                            console.warn(`Could not start secondary camera slot ${i}:`, secErr);
+                            el.webcams[i].srcObject = mainStream;
+                        }
+                    } else {
+                        el.webcams[i].srcObject = mainStream;
+                    }
+                }
+            } catch (enumErr) {
+                console.warn("Could not enumerate device inputs for secondary streams:", enumErr);
+                for (let i = 1; i < 4; i++) {
+                    el.webcams[i].srcObject = mainStream;
+                }
+            }
+
+            el.webcams[0].onloadedmetadata = async () => {
                 clearTimeout(_camTimer);
-                await el.webcam.play();
+                
+                // Play all feeds
+                for (let i = 0; i < 4; i++) {
+                    try {
+                        if (el.webcams[i].srcObject) {
+                            await el.webcams[i].play();
+                        }
+                    } catch (playErr) {
+                        console.warn(`Play error on webcam element ${i}:`, playErr);
+                    }
+                }
+
                 hideLoading();
                 syncCanvas();
                 await populateCamList();
-
-                if (el.resolution) el.resolution.textContent = `${el.webcam.videoWidth} x ${el.webcam.videoHeight}`;
 
                 state.active = true;
                 setPowerUI(true);
@@ -711,26 +764,36 @@ document.addEventListener("DOMContentLoaded", () => {
                     el.diagSensorState.className   = "m-value text-green";
                 }
 
+                updateActiveChannelsDisplay();
                 requestAnimationFrame(loop);
             };
         } catch(err) {
             clearTimeout(_camTimer);
             hideLoading();
-            setPowerUI(false);
-            if (el.vpStandby) el.vpStandby.classList.remove("hide");
+            stopCamera();
             console.error("Camera error:", err.name, err.message);
             alert(`Stream error: ${err.name} — ${err.message}`);
         }
     }
 
     function stopCamera() {
-        const s = el.webcam.srcObject;
-        if (s) s.getTracks().forEach(t => t.stop());
-        el.webcam.srcObject = null;
+        if (state.streams) {
+            state.streams.forEach(s => {
+                if (s) s.getTracks().forEach(t => t.stop());
+            });
+        }
+        state.streams = [];
+
+        el.webcams.forEach(w => {
+            w.srcObject = null;
+        });
 
         state.active = false;
         setPowerUI(false);
-        ctx2d.clearRect(0, 0, el.canvas.width, el.canvas.height);
+        
+        ctxs.forEach((ctx, i) => {
+            ctx.clearRect(0, 0, el.canvases[i].width, el.canvases[i].height);
+        });
 
         if (el.recBadge)   el.recBadge.classList.remove("active");
         if (el.alertBanner) el.alertBanner.classList.add("hide");
@@ -741,6 +804,7 @@ document.addEventListener("DOMContentLoaded", () => {
             el.diagSensorState.textContent = "STANDBY";
             el.diagSensorState.className   = "m-value text-amber";
         }
+        updateActiveChannelsDisplay();
     }
 
     function setPowerUI(on) {
@@ -748,10 +812,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function syncCanvas() {
-        el.canvas.width  = el.webcam.videoWidth  || el.webcam.clientWidth;
-        el.canvas.height = el.webcam.videoHeight || el.webcam.clientHeight;
+        for (let i = 0; i < 4; i++) {
+            el.canvases[i].width  = el.webcams[i].videoWidth  || el.webcams[i].clientWidth || 640;
+            el.canvases[i].height = el.webcams[i].videoHeight || el.webcams[i].clientHeight || 360;
+        }
     }
     window.addEventListener("resize", syncCanvas);
+
+    function updateActiveChannelsDisplay() {
+        const countDisplay = document.getElementById("active-channels-count");
+        if (!countDisplay) return;
+        if (!state.active) {
+            countDisplay.textContent = "0 Active / 4 Total";
+            return;
+        }
+        if (state.layoutMode === "single") {
+            countDisplay.textContent = "1 Active / 4 Total";
+        } else {
+            const activeStreamsCount = new Set(state.streams).size;
+            countDisplay.textContent = `${activeStreamsCount} Phys / 4 Total`;
+        }
+    }
 
     function showLoading(title, desc) {
         if (!el.loadingOverlay) return;
@@ -771,11 +852,28 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!state.active) return;
         const t0 = performance.now();
         try {
-            const preds = await state.model.detect(el.webcam);
-            state.latency = Math.round(performance.now() - t0);
-            if (el.latencyDisplay) el.latencyDisplay.textContent = `${state.latency} ms`;
-            countFPS();
-            processDetections(preds);
+            if (state.layoutMode === "single") {
+                const webcam = el.webcams[0];
+                if (webcam && webcam.readyState >= 2) {
+                    const preds = await state.model.detect(webcam);
+                    state.latency = Math.round(performance.now() - t0);
+                    if (el.latencyDisplay) el.latencyDisplay.textContent = `${state.latency} ms`;
+                    countFPS();
+                    processDetections(preds, 0);
+                }
+            } else {
+                // Round robin processing for Grid mode to preserve high performance
+                const idx = state.activeCamRoundRobin || 0;
+                const webcam = el.webcams[idx];
+                if (webcam && webcam.readyState >= 2) {
+                    const preds = await state.model.detect(webcam);
+                    state.latency = Math.round(performance.now() - t0);
+                    if (el.latencyDisplay) el.latencyDisplay.textContent = `${state.latency} ms`;
+                    countFPS();
+                    processDetections(preds, idx);
+                }
+                state.activeCamRoundRobin = (idx + 1) % 4;
+            }
         } catch(e) { console.error("Inference error:", e); }
         requestAnimationFrame(loop);
     }
@@ -792,10 +890,64 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
+       GEOMETRY TRIGGERS
+     ------------------------------------------------------- */
+    function lineIntersects(a, b, c, d) {
+        const ccw = (p, q, r) => (r.y - p.y) * (q.x - p.x) > (q.y - p.y) * (r.x - p.x);
+        return ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
+    }
+
+    function rectsOverlap(r1, r2) {
+        return !(r1.x + r1.w < r2.x || r2.x + r2.w < r1.x || r1.y + r1.h < r2.y || r2.y + r2.h < r1.y);
+    }
+
+    function checkTrigger(p, camIndex, canvas) {
+        const bounds = state.boundaries[camIndex];
+        if (bounds.tripwires.length === 0 && bounds.zones.length === 0) {
+            return true; // Default to allow if no boundaries defined
+        }
+
+        const [bx, by, bw, bh] = p.bbox;
+        const bboxLines = [
+            { p1: {x: bx, y: by}, p2: {x: bx + bw, y: by} }, // top
+            { p1: {x: bx, y: by + bh}, p2: {x: bx + bw, y: by + bh} }, // bottom
+            { p1: {x: bx, y: by}, p2: {x: bx, y: by + bh} }, // left
+            { p1: {x: bx + bw, y: by}, p2: {x: bx + bw, y: by + bh} } // right
+        ];
+        const bboxRect = { x: bx, y: by, w: bw, h: bh };
+
+        // Check tripwires
+        for (const tw of bounds.tripwires) {
+            const tp1 = { x: tw.p1.x * canvas.width, y: tw.p1.y * canvas.height };
+            const tp2 = { x: tw.p2.x * canvas.width, y: tw.p2.y * canvas.height };
+            for (const edge of bboxLines) {
+                if (lineIntersects(tp1, tp2, edge.p1, edge.p2)) {
+                    return true;
+                }
+            }
+        }
+
+        // Check exclusion/detection zones
+        for (const zone of bounds.zones) {
+            const zx = zone.x * canvas.width;
+            const zy = zone.y * canvas.height;
+            const zw = zone.w * canvas.width;
+            const zh = zone.h * canvas.height;
+            if (rectsOverlap(bboxRect, { x: zx, y: zy, w: zw, h: zh })) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /* -------------------------------------------------------
        PROCESS + RENDER DETECTIONS
      ------------------------------------------------------- */
-    function processDetections(preds) {
-        ctx2d.clearRect(0, 0, el.canvas.width, el.canvas.height);
+    function processDetections(preds, camIndex) {
+        const canvas = el.canvases[camIndex];
+        const ctx = ctxs[camIndex];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const hits = [];
         const curr = new Set();
@@ -803,34 +955,48 @@ document.addEventListener("DOMContentLoaded", () => {
         preds.forEach(p => {
             const label = p.class.toLowerCase().replace(/ /g, "_");
             if (p.score >= state.threshold && state.targets.has(label)) {
-                hits.push({ ...p, class: label });
-                curr.add(label);
+                const triggered = checkTrigger(p, camIndex, canvas);
+                hits.push({ ...p, class: label, triggered });
+                if (triggered) {
+                    curr.add(label);
+                }
             }
         });
 
-        if (hits.length) {
+        // Trigger alarms and database sync only for triggered hits
+        const activeAlerts = hits.filter(h => h.triggered);
+
+        if (activeAlerts.length) {
             if (el.alertBanner) el.alertBanner.classList.remove("hide");
-            if (el.alertText)   el.alertText.textContent = `${hits[0].class.toUpperCase().replace(/_/g," ")} LOCKED`;
+            if (el.alertText)   el.alertText.textContent = `CAM 0${camIndex+1}: ${activeAlerts[0].class.toUpperCase().replace(/_/g," ")} LOCKED`;
             beep();
 
             const now = Date.now();
-            // Push every hit into the rolling detection buffer (for the timeline chart)
-            hits.forEach(h => { state.detectionBuffer.push({ ts: now, label: h.class }); });
+            activeAlerts.forEach(h => { state.detectionBuffer.push({ ts: now, label: h.class }); });
             refreshTimelineChart();
 
-            hits.forEach(h => {
-                const last = state.lastLogged.get(h.class) || 0;
-                if (now - last > state.cooldown || !state.prevSet.has(h.class)) {
-                    postEvent(h.class, h.score, h.bbox);
-                    state.lastLogged.set(h.class, now);
+            activeAlerts.forEach(h => {
+                const lastKey = `${camIndex}_${h.class}`;
+                const last = state.lastLogged.get(lastKey) || 0;
+                if (now - last > state.cooldown || !state.prevSet.has(lastKey)) {
+                    postEvent(`[CAM 0${camIndex+1}] ${h.class}`, h.score, h.bbox);
+                    state.lastLogged.set(lastKey, now);
                 }
             });
+
+            // Update prevSet with compound keys to handle multiple cameras independently
+            const nextSet = new Set();
+            activeAlerts.forEach(h => nextSet.add(`${camIndex}_${h.class}`));
+            state.prevSet = nextSet;
         } else {
-            if (el.alertBanner) el.alertBanner.classList.add("hide");
+            // Check if alert banners should hide (no active alerts on any camera)
+            if (el.alertBanner && state.layoutMode === "single" && camIndex === 0) {
+                el.alertBanner.classList.add("hide");
+            }
         }
 
-        state.prevSet = curr;
-        drawBoxes(hits);
+        drawBoxes(hits, camIndex);
+        renderOverlayBoundaries(camIndex);
     }
 
     /* -------------------------------------------------------
@@ -845,81 +1011,157 @@ document.addEventListener("DOMContentLoaded", () => {
         _default:  { c:"#00ffd5", d:"rgba(0, 255, 213, 0.06)",  g:"rgba(0, 255, 213, 0.4)" },
     };
 
-    function drawBoxes(preds) {
+    function drawBoxes(preds, camIndex) {
+        const ctx = ctxs[camIndex];
+        const canvas = el.canvases[camIndex];
+
         preds.forEach(p => {
             const [x, y, w, h] = p.bbox;
             const label = p.class;
             const score = Math.round(p.score * 100);
-            const P     = PALETTE[label] || PALETTE._default;
-            const cl    = Math.min(16, Math.min(w, h) / 4);
+            
+            // Visual state configuration based on whether the detection triggered boundaries
+            const P = p.triggered ? (PALETTE[label] || PALETTE._default) : { c:"#475569", d:"rgba(71,85,105,0.03)", g:"rgba(71,85,105,0.15)" };
+            const cl = Math.min(16, Math.min(w, h) / 4);
 
             // Fill background translucent box
-            ctx2d.fillStyle = P.d;
-            ctx2d.fillRect(x, y, w, h);
+            ctx.fillStyle = P.d;
+            ctx.fillRect(x, y, w, h);
 
             // Stroke glowing outer frame
-            ctx2d.save();
-            ctx2d.strokeStyle = P.c;
-            ctx2d.lineWidth   = 1.5;
-            ctx2d.shadowColor = P.g;
-            ctx2d.shadowBlur  = 12;
-            ctx2d.strokeRect(x, y, w, h);
-            ctx2d.restore();
+            ctx.save();
+            ctx.strokeStyle = P.c;
+            ctx.lineWidth   = p.triggered ? 1.5 : 1.0;
+            if (!p.triggered) {
+                ctx.setLineDash([4, 4]);
+            } else {
+                ctx.shadowColor = P.g;
+                ctx.shadowBlur  = 12;
+            }
+            ctx.strokeRect(x, y, w, h);
+            ctx.restore();
 
-            // Corner brackets
-            ctx2d.strokeStyle = P.c;
-            ctx2d.lineWidth   = 3.0;
-            ctx2d.shadowColor = P.c;
-            ctx2d.shadowBlur  = 6;
-            [
-                [[x+cl,y],[x,y],[x,y+cl]],
-                [[x+w-cl,y],[x+w,y],[x+w,y+cl]],
-                [[x+cl,y+h],[x,y+h],[x,y+h-cl]],
-                [[x+w-cl,y+h],[x+w,y+h],[x+w,y+h-cl]]
-            ].forEach(pts => {
-                ctx2d.beginPath();
-                ctx2d.moveTo(...pts[0]);
-                ctx2d.lineTo(...pts[1]);
-                ctx2d.lineTo(...pts[2]);
-                ctx2d.stroke();
-            });
-            ctx2d.shadowBlur = 0;
+            // Corner brackets (Only on active alerts)
+            if (p.triggered) {
+                ctx.strokeStyle = P.c;
+                ctx.lineWidth   = 3.0;
+                ctx.shadowColor = P.c;
+                ctx.shadowBlur  = 6;
+                [
+                    [[x+cl,y],[x,y],[x,y+cl]],
+                    [[x+w-cl,y],[x+w,y],[x+w,y+cl]],
+                    [[x+cl,y+h],[x,y+h],[x,y+h-cl]],
+                    [[x+w-cl,y+h],[x+w,y+h],[x+w,y+h-cl]]
+                ].forEach(pts => {
+                    ctx.beginPath();
+                    ctx.moveTo(...pts[0]);
+                    ctx.lineTo(...pts[1]);
+                    ctx.lineTo(...pts[2]);
+                    ctx.stroke();
+                });
+                ctx.shadowBlur = 0;
+            }
 
             // Centre crosshairs
-            ctx2d.strokeStyle = P.c;
-            ctx2d.lineWidth   = 0.5;
-            ctx2d.globalAlpha = 0.35;
-            ctx2d.beginPath();
-            ctx2d.moveTo(x+w/2, y);     ctx2d.lineTo(x+w/2, y+8);
-            ctx2d.moveTo(x+w/2, y+h);   ctx2d.lineTo(x+w/2, y+h-8);
-            ctx2d.moveTo(x, y+h/2);     ctx2d.lineTo(x+8, y+h/2);
-            ctx2d.moveTo(x+w, y+h/2);   ctx2d.lineTo(x+w-8, y+h/2);
-            ctx2d.stroke();
-            ctx2d.globalAlpha = 1;
+            ctx.strokeStyle = P.c;
+            ctx.lineWidth   = 0.5;
+            ctx.globalAlpha = p.triggered ? 0.35 : 0.15;
+            ctx.beginPath();
+            ctx.moveTo(x+w/2, y);     ctx.lineTo(x+w/2, y+8);
+            ctx.moveTo(x+w/2, y+h);   ctx.lineTo(x+w/2, y+h-8);
+            ctx.moveTo(x, y+h/2);     ctx.lineTo(x+8, y+h/2);
+            ctx.moveTo(x+w, y+h/2);   ctx.lineTo(x+w-8, y+h/2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
 
             // Floating Label Banner
             const textString = `${label.replace(/_/g," ").toUpperCase()} ${score}%`;
-            ctx2d.font = `600 9px 'Inter', sans-serif`;
-            const textWidth = ctx2d.measureText(textString).width;
+            ctx.font = `600 9px 'Inter', sans-serif`;
+            const textWidth = ctx.measureText(textString).width;
 
-            ctx2d.fillStyle   = P.c;
-            ctx2d.shadowColor = P.c;
-            ctx2d.shadowBlur  = 6;
-            ctx2d.fillRect(x, y - 18, textWidth + 14, 18);
-            ctx2d.shadowBlur  = 0;
+            ctx.save();
+            ctx.fillStyle   = P.c;
+            if (p.triggered) {
+                ctx.shadowColor = P.c;
+                ctx.shadowBlur  = 6;
+            }
+            ctx.fillRect(x, y - 18, textWidth + 14, 18);
+            ctx.restore();
 
-            ctx2d.fillStyle = "#07090e";
-            ctx2d.fillText(textString, x + 7, y - 6);
+            ctx.fillStyle = "#07090e";
+            ctx.fillText(textString, x + 7, y - 6);
 
-            // Vector center sweep lines
-            ctx2d.strokeStyle = "rgba(0, 255, 213, 0.05)";
-            ctx2d.lineWidth   = 0.5;
-            ctx2d.globalAlpha = 0.4;
-            ctx2d.beginPath();
-            ctx2d.moveTo(el.canvas.width/2, el.canvas.height/2);
-            ctx2d.lineTo(x+w/2, y+h/2);
-            ctx2d.stroke();
-            ctx2d.globalAlpha = 1;
+            // Vector center sweep lines (Only on active alerts)
+            if (p.triggered) {
+                ctx.strokeStyle = "rgba(0, 255, 213, 0.05)";
+                ctx.lineWidth   = 0.5;
+                ctx.globalAlpha = 0.4;
+                ctx.beginPath();
+                ctx.moveTo(canvas.width/2, canvas.height/2);
+                ctx.lineTo(x+w/2, y+h/2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+        });
+    }
+
+    function renderOverlayBoundaries(camIndex) {
+        const canvas = el.canvases[camIndex];
+        const ctx = ctxs[camIndex];
+        const bounds = state.boundaries[camIndex];
+
+        // Draw zones
+        bounds.zones.forEach((zone, zIdx) => {
+            const zx = zone.x * canvas.width;
+            const zy = zone.y * canvas.height;
+            const zw = zone.w * canvas.width;
+            const zh = zone.h * canvas.height;
+
+            ctx.save();
+            ctx.strokeStyle = "var(--red)";
+            ctx.lineWidth = 1.5;
+            ctx.fillStyle = "rgba(244, 63, 94, 0.05)";
+            ctx.setLineDash([6, 4]);
+            ctx.strokeRect(zx, zy, zw, zh);
+            ctx.fillRect(zx, zy, zw, zh);
+            
+            // Draw label
+            ctx.fillStyle = "var(--red)";
+            ctx.font = "8px 'Share Tech Mono', monospace";
+            ctx.fillText(`ZONE 0${zIdx+1}`, zx + 5, zy + 12);
+            ctx.restore();
+        });
+
+        // Draw tripwires
+        bounds.tripwires.forEach((tw, tIdx) => {
+            const tx1 = tw.p1.x * canvas.width;
+            const ty1 = tw.p1.y * canvas.height;
+            const tx2 = tw.p2.x * canvas.width;
+            const ty2 = tw.p2.y * canvas.height;
+
+            ctx.save();
+            ctx.strokeStyle = "var(--amber)";
+            ctx.lineWidth = 2.0;
+            ctx.setLineDash([4, 4]);
+            ctx.shadowColor = "var(--amber)";
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.moveTo(tx1, ty1);
+            ctx.lineTo(tx2, ty2);
+            ctx.stroke();
+
+            // End handles
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "var(--amber)";
+            ctx.beginPath();
+            ctx.arc(tx1, ty1, 4, 0, Math.PI * 2);
+            ctx.arc(tx2, ty2, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Label
+            ctx.font = "8px 'Share Tech Mono', monospace";
+            ctx.fillText(`TRIPWIRE 0${tIdx+1}`, Math.min(tx1, tx2) + 5, Math.min(ty1, ty2) - 5);
+            ctx.restore();
         });
     }
 
@@ -1053,6 +1295,177 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
+       INTERACTIVE BOUNDARY DRAWING
+     ------------------------------------------------------- */
+    function initDrawingHandlers() {
+        el.canvases.forEach((canvas, idx) => {
+            let drawing = false;
+            let startPt = null;
+
+            canvas.addEventListener("mousedown", e => {
+                if (state.drawMode === "none" || !state.active) return;
+                drawing = true;
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width;
+                const y = (e.clientY - rect.top) / rect.height;
+                startPt = { x, y };
+                state.activeCamIndex = idx;
+                
+                if (state.drawMode === "tripwire" || state.drawMode === "zone") {
+                    state.tempPoint = startPt;
+                }
+            });
+
+            canvas.addEventListener("mousemove", e => {
+                if (!drawing || state.drawMode === "none") return;
+                const rect = canvas.getBoundingClientRect();
+                const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+                // Force immediate canvas redraw so preview updates dynamically
+                processDetections([], idx);
+                
+                const ctx = ctxs[idx];
+                ctx.save();
+                ctx.strokeStyle = state.drawMode === "tripwire" ? "var(--amber)" : "var(--red)";
+                ctx.lineWidth = 2.0;
+                ctx.setLineDash([4, 4]);
+
+                const cx = startPt.x * canvas.width;
+                const cy = startPt.y * canvas.height;
+                const curx = x * canvas.width;
+                const cury = y * canvas.height;
+
+                ctx.beginPath();
+                if (state.drawMode === "tripwire") {
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(curx, cury);
+                } else if (state.drawMode === "zone") {
+                    ctx.strokeRect(cx, cy, curx - cx, cury - cy);
+                }
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            canvas.addEventListener("mouseup", e => {
+                if (!drawing || state.drawMode === "none") return;
+                drawing = false;
+                const rect = canvas.getBoundingClientRect();
+                const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+                if (state.drawMode === "tripwire") {
+                    if (Math.hypot(startPt.x - x, startPt.y - y) > 0.02) {
+                        state.boundaries[idx].tripwires.push({
+                            p1: startPt,
+                            p2: { x, y }
+                        });
+                    }
+                } else if (state.drawMode === "zone") {
+                    const rx = Math.min(startPt.x, x);
+                    const ry = Math.min(startPt.y, y);
+                    const rw = Math.abs(startPt.x - x);
+                    const rh = Math.abs(startPt.y - y);
+                    if (rw > 0.02 && rh > 0.02) {
+                        state.boundaries[idx].zones.push({
+                            x: rx, y: ry, w: rw, h: rh
+                        });
+                    }
+                }
+                state.tempPoint = null;
+                processDetections([], idx);
+            });
+        });
+    }
+
+    function initLayoutAndToolbarBindings() {
+        // Layout buttons
+        const btnSingle = document.getElementById("btn-layout-single");
+        const btnGrid = document.getElementById("btn-layout-grid");
+        const camGrid = document.getElementById("camera-grid");
+        const feeds = document.querySelectorAll(".cam-feed");
+
+        if (btnSingle && btnGrid && camGrid) {
+            btnSingle.addEventListener("click", () => {
+                btnSingle.classList.add("active");
+                btnGrid.classList.remove("active");
+                camGrid.classList.remove("grid-mode");
+                
+                // Hide secondary feeds, activate only feed 1
+                feeds.forEach((feed, i) => {
+                    if (i === 0) feed.classList.add("active");
+                    else feed.classList.remove("active");
+                });
+
+                state.layoutMode = "single";
+                updateActiveChannelsDisplay();
+                syncCanvas();
+            });
+
+            btnGrid.addEventListener("click", () => {
+                btnGrid.classList.add("active");
+                btnSingle.classList.remove("active");
+                camGrid.classList.add("grid-mode");
+                
+                // Show all feeds
+                feeds.forEach(feed => feed.classList.add("active"));
+
+                state.layoutMode = "grid";
+                updateActiveChannelsDisplay();
+                syncCanvas();
+            });
+        }
+
+        // Drawing toolbar buttons
+        const toolNone = document.getElementById("tool-none");
+        const toolTripwire = document.getElementById("tool-tripwire");
+        const toolZone = document.getElementById("tool-zone");
+        const toolClear = document.getElementById("tool-clear");
+        const toolBtns = [toolNone, toolTripwire, toolZone];
+
+        function setActiveTool(mode, activeBtn) {
+            state.drawMode = mode;
+            toolBtns.forEach(btn => {
+                if (btn) btn.classList.remove("active");
+            });
+            if (activeBtn) activeBtn.classList.add("active");
+
+            // Toggle pointer crosshair styles on canvases
+            el.canvases.forEach(canvas => {
+                if (mode !== "none") {
+                    canvas.classList.add("drawing-active");
+                } else {
+                    canvas.classList.remove("drawing-active");
+                }
+            });
+        }
+
+        if (toolNone) {
+            toolNone.addEventListener("click", () => setActiveTool("none", toolNone));
+        }
+        if (toolTripwire) {
+            toolTripwire.addEventListener("click", () => setActiveTool("tripwire", toolTripwire));
+        }
+        if (toolZone) {
+            toolZone.addEventListener("click", () => setActiveTool("zone", toolZone));
+        }
+        if (toolClear) {
+            toolClear.addEventListener("click", () => {
+                state.boundaries.forEach(bounds => {
+                    bounds.tripwires = [];
+                    bounds.zones = [];
+                });
+                setActiveTool("none", toolNone);
+                
+                // Force clear canvas renders
+                for (let i = 0; i < 4; i++) {
+                    processDetections([], i);
+                }
+            });
+        }
+    }
+
+    /* -------------------------------------------------------
        INITIALIZATION
      ------------------------------------------------------- */
     async function init() {
@@ -1062,6 +1475,10 @@ document.addEventListener("DOMContentLoaded", () => {
         updateAlarmTargetDiag();
         await loadLogs();
         await populateCamList();
+
+        // Wire drawing handlers and layout/toolbar buttons
+        initDrawingHandlers();
+        initLayoutAndToolbarBindings();
 
         // Wire up time-window tab buttons
         document.querySelectorAll(".chart-tab").forEach(btn => {

@@ -537,7 +537,127 @@ body {
     100% { transform: translateY(580px); } /* arbitrary large amount or 100% top */
 }
 
-#webcam {
+/* Layout switch styling */
+.layout-toggle-wrap {
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-glass);
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    gap: 4px;
+}
+.layout-btn {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #64748b;
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.layout-btn:hover {
+    color: #fff;
+}
+.layout-btn.active {
+    background: var(--cyan-dim);
+    color: var(--cyan);
+    border: 1px solid rgba(0, 255, 213, 0.2);
+    text-shadow: var(--cyan-glow);
+}
+
+/* Floating Drawing Toolbar */
+.drawing-toolbar {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    background: rgba(14, 17, 26, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-glass);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    gap: 6px;
+    z-index: 10;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+.draw-tool-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #64748b;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+.draw-tool-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.05);
+}
+.draw-tool-btn.active {
+    background: var(--amber-dim);
+    color: var(--amber);
+    border-color: rgba(245, 158, 11, 0.3);
+    box-shadow: var(--amber-glow);
+}
+.draw-tool-btn.btn-clear-draw:hover {
+    color: var(--red);
+    background: var(--red-dim);
+    border-color: rgba(244, 63, 94, 0.3);
+}
+
+/* Camera Grid & Feed Slots */
+.camera-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    width: 100%;
+    height: 100%;
+    transition: var(--transition);
+}
+.camera-grid.grid-mode {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    padding: 8px;
+}
+
+.cam-feed {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #020305;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid transparent;
+    display: none;
+    transition: var(--transition);
+}
+.cam-feed.active {
+    display: block;
+}
+.camera-grid.grid-mode .cam-feed {
+    display: block;
+    border: 1px solid var(--border-glass);
+}
+.camera-grid.grid-mode .cam-feed:hover {
+    border-color: var(--border-hi);
+    box-shadow: 0 0 10px rgba(0, 255, 213, 0.05);
+}
+
+.cam-feed video {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -546,14 +666,42 @@ body {
     display: block;
     z-index: 1;
 }
-
-#hud-overlay {
+.cam-feed canvas {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     z-index: 2;
+    cursor: default;
+}
+.cam-feed canvas.drawing-active {
+    cursor: crosshair;
+}
+
+.cam-feed-label {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    color: rgba(255, 255, 255, 0.4);
+    background: rgba(0, 0, 0, 0.6);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: 3;
     pointer-events: none;
+}
+
+/* Cyberpunk Camera Simulation Filters */
+#webcam-2 {
+    filter: hue-rotate(180deg) saturate(3) contrast(1.5) invert(0.1);
+}
+#webcam-3 {
+    filter: sepia(1) hue-rotate(90deg) saturate(2.5) brightness(0.85) contrast(1.4);
+}
+#webcam-4 {
+    filter: grayscale(1) contrast(1.7) brightness(0.9) sepia(0.15);
 }
 
 /* REC status indicator badge */

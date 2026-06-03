@@ -151,7 +151,15 @@
                     <span class="live-dot"></span>
                     <span>LIVE FEED</span>
                 </div>
-                <span class="feed-id">// CAMERA_INPUT_01</span>
+                <div class="layout-toggle-wrap">
+                    <button class="layout-btn active" id="btn-layout-single" title="Single Feed Monitor">
+                        <i class="fa-solid fa-square"></i> SINGLE
+                    </button>
+                    <button class="layout-btn" id="btn-layout-grid" title="Grid Multi-Feed Monitor">
+                        <i class="fa-solid fa-table-cells-large"></i> GRID
+                    </button>
+                </div>
+                <span class="feed-id" id="feed-id-display">// CAMERA_INPUT_01</span>
             </div>
 
             <!-- Webcam & Overlay Area -->
@@ -186,6 +194,22 @@
                     </div>
                 </div>
 
+                <!-- Drawing overlay toolbar -->
+                <div class="drawing-toolbar" id="drawing-toolbar">
+                    <button class="draw-tool-btn active" id="tool-none" title="Normal Monitor Mode">
+                        <i class="fa-solid fa-mouse-pointer"></i>
+                    </button>
+                    <button class="draw-tool-btn" id="tool-tripwire" title="Draw Tripwire Line">
+                        <i class="fa-solid fa-arrows-left-right-to-line"></i>
+                    </button>
+                    <button class="draw-tool-btn" id="tool-zone" title="Draw Exclusion Zone">
+                        <i class="fa-solid fa-vector-square"></i>
+                    </button>
+                    <button class="draw-tool-btn btn-clear-draw" id="tool-clear" title="Clear All Boundaries">
+                        <i class="fa-solid fa-eraser"></i>
+                    </button>
+                </div>
+
                 <!-- Detection Alert Strip -->
                 <div class="detection-alert-strip hide" id="detection-alert-banner">
                     <i class="fa-solid fa-triangle-exclamation"></i>
@@ -197,16 +221,40 @@
                     <span class="rec-dot"></span> SECURE REC
                 </div>
 
-                <!-- Video elements -->
-                <video id="webcam" autoplay playsinline muted></video>
-                <canvas id="hud-overlay"></canvas>
+                <!-- Camera Grid Viewports -->
+                <div class="camera-grid" id="camera-grid">
+                    <!-- Feed 1 -->
+                    <div class="cam-feed active" id="feed-container-1" data-index="0">
+                        <video id="webcam-1" autoplay playsinline muted></video>
+                        <canvas id="hud-overlay-1"></canvas>
+                        <div class="cam-feed-label">CAM 01 // SELECTED SOURCE</div>
+                    </div>
+                    <!-- Feed 2 -->
+                    <div class="cam-feed" id="feed-container-2" data-index="1">
+                        <video id="webcam-2" autoplay playsinline muted></video>
+                        <canvas id="hud-overlay-2"></canvas>
+                        <div class="cam-feed-label">CAM 02 // THERMAL INFRARED</div>
+                    </div>
+                    <!-- Feed 3 -->
+                    <div class="cam-feed" id="feed-container-3" data-index="2">
+                        <video id="webcam-3" autoplay playsinline muted></video>
+                        <canvas id="hud-overlay-3"></canvas>
+                        <div class="cam-feed-label">CAM 03 // NIGHT VISION</div>
+                    </div>
+                    <!-- Feed 4 -->
+                    <div class="cam-feed" id="feed-container-4" data-index="3">
+                        <video id="webcam-4" autoplay playsinline muted></video>
+                        <canvas id="hud-overlay-4"></canvas>
+                        <div class="cam-feed-label">CAM 04 // RETRO SURVEILLANCE</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Telemetry summary footer -->
             <div class="viewport-footer">
                 <div class="footer-stat">
-                    <span class="f-label">SOURCE DIMENSION</span>
-                    <span class="f-value pg-val">-- x --</span>
+                    <span class="f-label">ACTIVE CHANNELS</span>
+                    <span class="f-value pg-val" id="active-channels-count">1 Active / 4 Total</span>
                 </div>
                 <div class="stat-divider"></div>
                 <div class="footer-stat">
