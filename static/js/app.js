@@ -974,6 +974,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (el.totalEvents) el.totalEvents.textContent = state.logs.length;
             renderTable(state.logs);
             refreshChart(state.logs);
+            updateOverviewTransactions(state.logs);
+            const savingsEl = document.getElementById("overview-savings-val");
+            if (savingsEl) {
+                savingsEl.textContent = `$${(2512.40 + state.logs.length * 1.25).toFixed(2)}`;
+            }
         } catch(e) { console.error("loadLogs:", e); }
     }
 
@@ -988,7 +993,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (r.ok) {
                 const res = await r.json();
                 const eventId = res.event.id;
-                // Fire push notification if enabled and page is hidden
                 if (state.pushEnabled) {
                     sendPushNotification(label, confidence);
                 }
@@ -2420,6 +2424,217 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
+       MULTI-VIEW NAV TOGGLER & CASHMATE DASHBOARD
+     ------------------------------------------------------- */
+    let cmSavingsChartObj = null;
+    let cmInvestmentsChartObj = null;
+    let cmMainBarChartObj = null;
+
+    function initTabNavigation() {
+        const pills = document.querySelectorAll("#nav-view-pills .nav-pill");
+        const views = document.querySelectorAll(".view-section");
+
+        pills.forEach(pill => {
+            pill.addEventListener("click", () => {
+                pills.forEach(p => p.classList.remove("active"));
+                pill.classList.add("active");
+
+                const targetView = pill.dataset.view;
+                views.forEach(view => {
+                    if (view.id === `view-${targetView}`) {
+                        view.classList.add("active");
+                    } else {
+                        view.classList.remove("active");
+                    }
+                });
+
+                // Update layout states or refresh dynamic charts
+                if (targetView === "overview") {
+                    setTimeout(initOverviewCharts, 50);
+                } else if (targetView === "metrics") {
+                    setTimeout(() => {
+                        if (state.chart) state.chart.resize();
+                        if (state.timelineChart) state.timelineChart.resize();
+                    }, 50);
+                }
+            });
+        });
+    }
+
+    function initOverviewCharts() {
+        const savingsCtx = document.getElementById("cm-savings-chart")?.getContext("2d");
+        const invCtx = document.getElementById("cm-investments-chart")?.getContext("2d");
+        const mainBarCtx = document.getElementById("cm-main-bar-chart")?.getContext("2d");
+
+        // 1. Savings Chart (Red Line)
+        if (savingsCtx && !cmSavingsChartObj) {
+            cmSavingsChartObj = new Chart(savingsCtx, {
+                type: "line",
+                data: {
+                    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+                    datasets: [{
+                        data: [2200, 2400, 2300, 2512, 2450, 2480, 2512],
+                        borderColor: "#f43f5e",
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                }
+            });
+        }
+
+        // 2. Investments Chart (Green Area)
+        if (invCtx && !cmInvestmentsChartObj) {
+            const greenGrad = invCtx.createLinearGradient(0, 0, 0, 45);
+            greenGrad.addColorStop(0, "rgba(16, 185, 129, 0.25)");
+            greenGrad.addColorStop(1, "rgba(16, 185, 129, 0.0)");
+
+            cmInvestmentsChartObj = new Chart(invCtx, {
+                type: "line",
+                data: {
+                    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+                    datasets: [{
+                        data: [800, 950, 900, 1100, 1050, 1180, 1215],
+                        borderColor: "#10b981",
+                        borderWidth: 2,
+                        backgroundColor: greenGrad,
+                        fill: true,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                }
+            });
+        }
+
+        // 3. Large Spent Bar Chart (Vibrant colors matching Cashmate)
+        if (mainBarCtx && !cmMainBarChartObj) {
+            cmMainBarChartObj = new Chart(mainBarCtx, {
+                type: "bar",
+                data: {
+                    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+                    datasets: [
+                        {
+                            label: "Expenses",
+                            data: [150, 180, 140, 280, 240, 310, 190],
+                            backgroundColor: "#10b981",
+                            borderRadius: 4,
+                            barThickness: 12
+                        },
+                        {
+                            label: "Transfers",
+                            data: [200, 220, 210, 180, 300, 240, 350],
+                            backgroundColor: "#3b82f6",
+                            borderRadius: 4,
+                            barThickness: 12
+                        },
+                        {
+                            label: "Subscriptions",
+                            data: [120, 130, 110, 150, 140, 180, 160],
+                            backgroundColor: "#c084fc",
+                            borderRadius: 4,
+                            barThickness: 12
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: "bottom",
+                            labels: { color: "#64748b", font: { family: "Inter", size: 10 } }
+                        },
+                        tooltip: {
+                            backgroundColor: "#0e111a",
+                            borderColor: "rgba(255,255,255,0.05)",
+                            borderWidth: 1,
+                            titleColor: "#fff",
+                            bodyColor: "#cbd5e1"
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: "#64748b", font: { family: "Inter", size: 10 } }
+                        },
+                        y: {
+                            grid: { color: "rgba(255,255,255,0.02)" },
+                            ticks: { color: "#64748b", font: { family: "Inter", size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    function updateOverviewTransactions(logs) {
+        const container = document.getElementById("overview-transactions-list");
+        if (!container) return;
+
+        if (logs.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="padding: 24px; text-align: center;">
+                    <i class="fa-solid fa-signature" style="font-size: 1.5rem; color: #475569; margin-bottom: 8px;"></i>
+                    <p style="font-size: 0.8rem; color: #64748b;">No recent alerts. Monitoring active...</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Display past 6 transactions
+        const recent = logs.slice(0, 6);
+        container.innerHTML = recent.map(l => {
+            let colorClass = "bg-purple";
+            let iconClass = "fa-user-secret";
+            const lbl = l.label.toLowerCase();
+
+            if (lbl.includes("person")) { colorClass = "bg-purple"; iconClass = "fa-user-secret"; }
+            else if (lbl.includes("car") || lbl.includes("truck") || lbl.includes("vehicle")) { colorClass = "bg-blue"; iconClass = "fa-car"; }
+            else if (lbl.includes("laptop") || lbl.includes("tv") || lbl.includes("cell")) { colorClass = "bg-yellow"; iconClass = "fa-laptop"; }
+            else { colorClass = "bg-green"; iconClass = "fa-circle-dot"; }
+
+            const confVal = Math.round(l.confidence * 100);
+            const timeStr = new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            return `
+                <div class="cm-transaction-item">
+                    <div class="cm-icon-circle ${colorClass}"><i class="fa-solid ${iconClass}"></i></div>
+                    <div class="cm-tx-details">
+                        <span class="cm-tx-name">${l.label} Detected</span>
+                        <span class="cm-tx-date">Today, ${timeStr}</span>
+                    </div>
+                    <span class="cm-tx-amount positive">${confVal}% Conf.</span>
+                </div>
+            `;
+        }).join("");
+    }
+
+    function appendDiagTerminal(message) {
+        const term = document.getElementById("diag-terminal-log");
+        if (!term) return;
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour12: false });
+        const line = document.createElement("div");
+        line.className = "term-line";
+        line.innerHTML = `<span class="term-time">[${timeStr}]</span> ${message}`;
+        term.appendChild(line);
+        term.scrollTop = term.scrollHeight;
+    }
+
+    /* -------------------------------------------------------
        INITIALIZATION
      ------------------------------------------------------- */
     async function init() {
@@ -2430,13 +2645,16 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadLogs();
         await populateCamList();
 
-        // Wire drawing handlers and layout/toolbar buttons
+        // Wire drawing handlers and layout/toolbar bindings
         initDrawingHandlers();
         initLayoutAndToolbarBindings();
 
         // Initialize persistent settings (webhook URL, push toggle)
         initSettingsPersistence();
         await initPushNotifications();
+
+        // Wire up tab views toggling
+        initTabNavigation();
 
         // Wire up time-window tab buttons
         document.querySelectorAll(".chart-tab").forEach(btn => {
@@ -2448,16 +2666,21 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
+        // Initialize Cashmate dashboard on start
+        initOverviewCharts();
+
         // Rolling 2-second tick — makes the chart scroll forward even with no new events
         setInterval(refreshTimelineChart, 2000);
 
         showLoading("INITIALIZING NEURAL NET", "Fetching COCO-SSD weights from node...");
+        appendDiagTerminal("LOADING NEURAL NET WEIGHTS (COCO-SSD)...");
 
         try {
             state.model = await cocoSsd.load();
             state.ready = true;
             setBadge("online", "ONLINE");
             hideLoading();
+            appendDiagTerminal("COCO-SSD READY // ENGINE ONLINE");
 
             if (el.vpStandby) el.vpStandby.classList.remove("hide");
             await pickBestCamera();
@@ -2466,8 +2689,11 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("TensorFlow initialization error:", e);
             setBadge("error", "ERROR");
             showLoading("NEURAL NETWORK ERROR", "Network error. Check server logs.");
+            appendDiagTerminal("NEURAL NETWORK CRITICAL LOAD ERROR");
         }
     }
 
     init();
 });
+
+

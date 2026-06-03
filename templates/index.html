@@ -37,12 +37,12 @@
         </div>
         
         <!-- Navigation Tabs (Resq.io Style) -->
-        <nav class="nav-pills">
-            <button class="nav-pill active"><i class="fa-solid fa-gauge"></i> Overview</button>
-            <button class="nav-pill"><i class="fa-solid fa-video"></i> Live Feed</button>
-            <button class="nav-pill"><i class="fa-solid fa-list-check"></i> Incidents</button>
-            <button class="nav-pill"><i class="fa-solid fa-chart-simple"></i> Metrics</button>
-            <button class="nav-pill"><i class="fa-solid fa-circle-nodes"></i> Diagnostics</button>
+        <nav class="nav-pills" id="nav-view-pills">
+            <button class="nav-pill active" data-view="overview"><i class="fa-solid fa-gauge"></i> Overview</button>
+            <button class="nav-pill" data-view="livefeed"><i class="fa-solid fa-video"></i> Live Feed</button>
+            <button class="nav-pill" data-view="incidents"><i class="fa-solid fa-list-check"></i> Incidents</button>
+            <button class="nav-pill" data-view="metrics"><i class="fa-solid fa-chart-simple"></i> Metrics</button>
+            <button class="nav-pill" data-view="diagnostics"><i class="fa-solid fa-circle-nodes"></i> Diagnostics</button>
         </nav>
     </div>
 
@@ -72,455 +72,600 @@
     </div>
 </header>
 
-<!-- ===================== MAIN HERO SECTION ===================== -->
-<section class="hero-banner">
-    <div class="hero-text">
-        <h1 class="welcome-title">System Console // <span class="highlight">Active Operator</span></h1>
-        
-        <!-- Small circular status tags -->
-        <div class="status-tags">
-            <div class="tag-item">
-                <div class="tag-circle color-cyan">20%</div>
-                <span class="tag-label">CPU LOAD</span>
+<!-- ===================== VIEW WRAPPERS ===================== -->
+<div id="main-content-wrapper">
+
+    <!-- ========== 1. OVERVIEW VIEW (CASHMATE STYLE) ========== -->
+    <div id="view-overview" class="view-section active">
+        <!-- Top Cashmate Metric Cards -->
+        <section class="overview-metrics-row">
+            <!-- Metric 1: Total Spendings / Detections -->
+            <div class="cashmate-metric-card color-purple">
+                <div class="cm-card-header">
+                    <span class="cm-label">TOTAL SPENDINGS</span>
+                    <span class="cm-trend negative">-12%</span>
+                </div>
+                <div class="cm-card-value">$832.88</div>
+                <div class="cm-mini-bar-chart">
+                    <!-- Vertical percentage metrics -->
+                    <div class="cm-bar-wrap" style="height: 35%;" title="Mon: 35%"><span class="day-lbl">35%</span></div>
+                    <div class="cm-bar-wrap" style="height: 12%;" title="Tue: 12%"><span class="day-lbl">12%</span></div>
+                    <div class="cm-bar-wrap" style="height: 28%;" title="Wed: 28%"><span class="day-lbl">28%</span></div>
+                    <div class="cm-bar-wrap" style="height: 9%;"  title="Thu: 9%"><span class="day-lbl">9%</span></div>
+                    <div class="cm-bar-wrap" style="height: 24%;" title="Fri: 24%"><span class="day-lbl">24%</span></div>
+                </div>
+                <span class="cm-sub">THIS WEEK</span>
             </div>
-            <div class="tag-item">
-                <div class="tag-circle color-white">42%</div>
-                <span class="tag-label">RAM USAGE</span>
+
+            <!-- Metric 2: Savings / Alarm Detections -->
+            <div class="cashmate-metric-card color-red">
+                <div class="cm-card-header">
+                    <span class="cm-label">SAVINGS</span>
+                    <span class="cm-trend negative">-2%</span>
+                </div>
+                <div class="cm-card-value" id="overview-savings-val">$2,512.40</div>
+                <div class="cm-mini-chart-canvas-wrap">
+                    <canvas id="cm-savings-chart"></canvas>
+                </div>
+                <span class="cm-sub">THIS YEAR</span>
             </div>
-            <div class="tag-item">
-                <div class="tag-circle color-dim">15%</div>
-                <span class="tag-label">DB LOAD</span>
+
+            <!-- Metric 3: Investments / System Reliability -->
+            <div class="cashmate-metric-card color-green">
+                <div class="cm-card-header">
+                    <span class="cm-label">INVESTMENTS</span>
+                    <span class="cm-trend positive">+4%</span>
+                </div>
+                <div class="cm-card-value">$1,215.25</div>
+                <div class="cm-mini-chart-canvas-wrap">
+                    <canvas id="cm-investments-chart"></canvas>
+                </div>
+                <span class="cm-sub">THIS YEAR</span>
             </div>
-            <div class="tag-item font-dashed">
-                <div class="tag-circle color-stripe">SEC</div>
-                <span class="tag-label">ENCRYPTED</span>
+        </section>
+
+        <!-- Main Cashmate Layout -->
+        <section class="overview-grid">
+            <!-- Left Panel: Transactions / Recent Incidents -->
+            <div class="cashmate-panel-card left-panel">
+                <div class="cm-panel-header">
+                    <span class="cm-panel-title">Transactions</span>
+                </div>
+                <div class="cm-transactions-list" id="overview-transactions-list">
+                    <!-- Dynamically populated transaction alerts -->
+                    <div class="cm-transaction-item">
+                        <div class="cm-icon-circle bg-purple"><i class="fa-solid fa-user-secret"></i></div>
+                        <div class="cm-tx-details">
+                            <span class="cm-tx-name">Simon Pegg // Person</span>
+                            <span class="cm-tx-date">Today, 6:22 PM</span>
+                        </div>
+                        <span class="cm-tx-amount positive">+44.80</span>
+                    </div>
+                    <div class="cm-transaction-item">
+                        <div class="cm-icon-circle bg-yellow"><i class="fa-solid fa-music"></i></div>
+                        <div class="cm-tx-details">
+                            <span class="cm-tx-name">Apple Music // Laptop</span>
+                            <span class="cm-tx-date">Today, 12:30 PM</span>
+                        </div>
+                        <span class="cm-tx-amount negative">-9.99</span>
+                    </div>
+                    <div class="cm-transaction-item">
+                        <div class="cm-icon-circle bg-blue"><i class="fa-solid fa-store"></i></div>
+                        <div class="cm-tx-details">
+                            <span class="cm-tx-name">7-Eleven // Car</span>
+                            <span class="cm-tx-date">Yesterday</span>
+                        </div>
+                        <span class="cm-tx-amount negative">-5.18</span>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <!-- Right Panel: Total Spent Large Chart -->
+            <div class="cashmate-panel-card right-panel">
+                <div class="cm-panel-header flex-between">
+                    <div>
+                        <span class="cm-panel-title" id="cm-main-chart-title">$9,340.80 Spent</span>
+                    </div>
+                    <div class="cm-chart-selectors">
+                        <button class="cm-sel-btn">Day</button>
+                        <button class="cm-sel-btn">Week</button>
+                        <button class="cm-sel-btn">Month</button>
+                        <button class="cm-sel-btn active">Year</button>
+                    </div>
+                </div>
+                <!-- Large Bar Chart Canvas -->
+                <div class="cm-large-chart-container">
+                    <canvas id="cm-main-bar-chart"></canvas>
+                </div>
+            </div>
+        </section>
     </div>
 
-    <!-- Top Telemetry Row (Metric indicators on right) -->
-    <div class="top-telemetry">
-        <div class="metric-card card-cyan">
-            <div class="metric-header">
-                <span class="metric-label">CRITICAL DETECTIONS</span>
-                <span class="badge trend-up"><i class="fa-solid fa-arrow-trend-up"></i> +12%</span>
-            </div>
-            <div class="metric-body">
-                <span class="metric-number" id="cumulative-counter">0</span>
-                <span class="metric-sub">Logged events</span>
-            </div>
-        </div>
-
-        <div class="metric-card card-green">
-            <div class="metric-header">
-                <span class="metric-label">FRAME RATE</span>
-                <span class="badge trend-up"><i class="fa-solid fa-arrow-trend-up"></i> +5%</span>
-            </div>
-            <div class="metric-body">
-                <span class="metric-number" id="fps-display">– FPS</span>
-                <span class="metric-sub">Camera decode</span>
-            </div>
-        </div>
-
-        <div class="metric-card card-red">
-            <div class="metric-header">
-                <span class="metric-label">INFERENCE TIME</span>
-                <span class="badge trend-down"><i class="fa-solid fa-arrow-trend-down"></i> -15%</span>
-            </div>
-            <div class="metric-body">
-                <span class="metric-number" id="latency-display">– ms</span>
-                <span class="metric-sub">GPU Processing</span>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- ===================== DASHBOARD MAIN GRID ===================== -->
-<main class="dashboard-grid">
-
-    <!-- ========== LEFT COLUMN: VIEWPORT & TELEMETRY ========== -->
-    <section class="left-column">
-        <!-- Viewport Card -->
-        <div class="viewport-card">
-            <!-- HUD decorative brackets -->
-            <div class="bracket tl"></div>
-            <div class="bracket tr"></div>
-            <div class="bracket bl"></div>
-            <div class="bracket br"></div>
-
-            <!-- Feed header line -->
-            <div class="viewport-header">
-                <div class="live-tag">
-                    <span class="live-dot"></span>
-                    <span>LIVE FEED</span>
-                </div>
-                <div class="layout-toggle-wrap">
-                    <button class="layout-btn active" id="btn-layout-single" title="Single Feed Monitor">
-                        <i class="fa-solid fa-square"></i> SINGLE
-                    </button>
-                    <button class="layout-btn" id="btn-layout-grid" title="Grid Multi-Feed Monitor">
-                        <i class="fa-solid fa-table-cells-large"></i> GRID
-                    </button>
-                </div>
-                <span class="feed-id" id="feed-id-display">// CAMERA_INPUT_01</span>
-            </div>
-
-            <!-- Webcam & Overlay Area -->
-            <div class="viewport-container" id="viewport">
-                <!-- Grid scanning line -->
-                <div class="viewport-scanline"></div>
-
-                <!-- Model Loading Overlay -->
-                <div class="vp-overlay" id="loading-overlay">
-                    <div class="vp-overlay-content">
-                        <div class="spinner-icon">
-                            <i class="fa-solid fa-circle-notch fa-spin"></i>
-                        </div>
-                        <h3 class="overlay-title" id="loading-title">INITIALIZING NEURAL NET</h3>
-                        <p class="overlay-desc" id="loading-desc">Loading COCO-SSD weights...</p>
-                        <div class="progress-bar-wrap">
-                            <div class="progress-bar-fill" id="progress-fill"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Standby Screen (Subtle Matrix background grid) -->
-                <div class="vp-standby" id="vp-standby">
-                    <div class="standby-grid-overlay"></div>
-                    <div class="standby-scan"></div>
-                    <div class="standby-content">
-                        <div class="standby-logo">
-                            <i class="fa-solid fa-shield-halved"></i>
-                        </div>
-                        <h2 class="standby-title">SENSOR STANDBY</h2>
-                        <p class="standby-subtitle">Toggle SENSOR POWER on the panel to begin tracking</p>
-                    </div>
-                </div>
-
-                <!-- Drawing overlay toolbar -->
-                <div class="drawing-toolbar" id="drawing-toolbar">
-                    <button class="draw-tool-btn active" id="tool-none" title="Normal Monitor Mode">
-                        <i class="fa-solid fa-mouse-pointer"></i>
-                    </button>
-                    <button class="draw-tool-btn" id="tool-tripwire" title="Draw Tripwire Line">
-                        <i class="fa-solid fa-arrows-left-right-to-line"></i>
-                    </button>
-                    <button class="draw-tool-btn" id="tool-zone" title="Draw Exclusion Zone">
-                        <i class="fa-solid fa-vector-square"></i>
-                    </button>
-                    <button class="draw-tool-btn" id="tool-heatmap" title="Toggle Heatmap Overlay">
-                        <i class="fa-solid fa-fire"></i>
-                    </button>
-                    <button class="draw-tool-btn btn-clear-draw" id="tool-clear" title="Clear All Boundaries">
-                        <i class="fa-solid fa-eraser"></i>
-                    </button>
-                </div>
-
-                <!-- Detection Alert Strip -->
-                <div class="detection-alert-strip hide" id="detection-alert-banner">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    <span id="alert-banner-text">TARGET ACQUIRED // LOCK CONFIRMED</span>
-                </div>
-
-                <!-- REC status pill -->
-                <div class="rec-badge" id="rec-badge">
-                    <span class="rec-dot"></span> SECURE REC
-                </div>
-
-                <!-- Camera Grid Viewports -->
-                <div class="camera-grid" id="camera-grid">
-                    <!-- Feed 1 -->
-                    <div class="cam-feed active" id="feed-container-1" data-index="0">
-                        <video id="webcam-1" autoplay playsinline muted></video>
-                        <canvas id="hud-overlay-1"></canvas>
-                        <div class="cam-feed-label">CAM 01 // SELECTED SOURCE</div>
-                    </div>
-                    <!-- Feed 2 -->
-                    <div class="cam-feed" id="feed-container-2" data-index="1">
-                        <video id="webcam-2" autoplay playsinline muted></video>
-                        <canvas id="hud-overlay-2"></canvas>
-                        <div class="cam-feed-label">CAM 02 // THERMAL INFRARED</div>
-                    </div>
-                    <!-- Feed 3 -->
-                    <div class="cam-feed" id="feed-container-3" data-index="2">
-                        <video id="webcam-3" autoplay playsinline muted></video>
-                        <canvas id="hud-overlay-3"></canvas>
-                        <div class="cam-feed-label">CAM 03 // NIGHT VISION</div>
-                    </div>
-                    <!-- Feed 4 -->
-                    <div class="cam-feed" id="feed-container-4" data-index="3">
-                        <video id="webcam-4" autoplay playsinline muted></video>
-                        <canvas id="hud-overlay-4"></canvas>
-                        <div class="cam-feed-label">CAM 04 // RETRO SURVEILLANCE</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Telemetry summary footer -->
-            <div class="viewport-footer">
-                <div class="footer-stat">
-                    <span class="f-label">ACTIVE CHANNELS</span>
-                    <span class="f-value pg-val" id="active-channels-count">1 Active / 4 Total</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="footer-stat">
-                    <span class="f-label">ENGINE STATUS</span>
-                    <span class="status-badge" id="model-status-badge">
-                        <span class="status-dot green"></span> ONLINE
-                    </span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ========== RIGHT COLUMN: SIDEBAR CONTROLS ========== -->
-    <aside class="right-column">
-
-        <!-- DIAGNOSTIC STATS CARD -->
-        <div class="panel-card diagnostic-card">
-            <div class="card-title">// DIAGNOSTIC INTEGRITY</div>
-            <div class="diag-matrix">
-                <div class="matrix-item">
-                    <span class="m-label">SENSOR STATE</span>
-                    <span class="m-value text-amber" id="diag-sensor-state">STANDBY</span>
-                </div>
-                <div class="matrix-item">
-                    <span class="m-label">ACTIVE ALARM TARGET</span>
-                    <span class="m-value text-cyan" id="diag-alarm-target">ALL</span>
-                </div>
-                <div class="matrix-item">
-                    <span class="m-label">AUDIO SYNTH</span>
-                    <span class="m-value text-orange" id="diag-synth-status">ONLINE</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- CONTROLS CARD -->
-        <div class="panel-card controls-card">
-            <div class="card-title">// SENSOR SYSTEM PARAMETERS</div>
-
-            <!-- Sensor Power Switch -->
-            <div class="control-row">
-                <div class="control-info">
-                    <span class="ctrl-title">SENSOR POWER</span>
-                    <span class="ctrl-desc">Enable core webcam tracking pipeline</span>
-                </div>
-                <label class="switch-toggle">
-                    <input type="checkbox" id="switch-sensor-power-new">
-                    <span class="switch-slider"></span>
-                </label>
-            </div>
-            <!-- Hidden refs for script compatibility -->
-            <div id="btn-camera-power-text" style="display:none"></div>
-
-            <!-- Input Dropdown -->
-            <div class="control-col">
-                <span class="ctrl-title">SELECT INPUT SOURCE</span>
-                <div class="dropdown-wrapper">
-                    <select id="select-camera" class="custom-select">
-                        <option value="">Querying input devices...</option>
-                    </select>
-                    <i class="fa-solid fa-chevron-down caret-icon"></i>
-                </div>
-            </div>
-
-            <!-- Threshold Slider -->
-            <div class="control-col">
-                <div class="flex-between">
-                    <span class="ctrl-title">DETECTION THRESHOLD</span>
-                    <span class="ctrl-value text-cyan" id="stat-threshold">65%</span>
-                </div>
-                <div class="slider-container">
-                    <input type="range" id="slider-threshold-new" min="40" max="95" value="65" class="custom-range range-cyan">
-                    <div class="range-labels">
-                        <span>40%</span><span>65%</span><span>95%</span>
-                    </div>
-                </div>
-                <!-- Hidden refs for script compatibility -->
-                <div id="dial-tooltip" style="display:none">65%</div>
-            </div>
-
-            <!-- Sound Alarm & Volume -->
-            <div class="control-col">
-                <div class="flex-between">
-                    <span class="ctrl-title">AUDIO SIREN ALARM</span>
-                    <label class="switch-toggle mini-switch">
-                        <input type="checkbox" id="switch-sound-alarm" checked>
-                        <span class="switch-slider"></span>
-                    </label>
-                </div>
-                <div class="volume-slider-wrap">
-                    <span class="ctrl-desc">Volume</span>
-                    <div class="slider-container">
-                        <input type="range" id="slider-volume" min="5" max="100" value="50" class="custom-range range-amber">
-                        <div class="flex-between font-mono-small">
-                            <span>MIN</span>
-                            <span id="val-volume-new">50%</span>
-                            <span>MAX</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Hidden ref for script compatibility -->
-            <button id="btn-deposit-siren" style="display:none"></button>
-
-            <!-- WEBHOOK & PUSH ALERTS PANEL -->
-            <div class="control-col target-filters-section">
-                <span class="ctrl-title mb-4 block">WEBHOOK &amp; PUSH ALERTS</span>
+    <!-- ========== 2. LIVE FEED VIEW ========== -->
+    <div id="view-livefeed" class="view-section">
+        <!-- ===================== MAIN HERO SECTION ===================== -->
+        <section class="hero-banner">
+            <div class="hero-text">
+                <h1 class="welcome-title">System Console // <span class="highlight">Active Operator</span></h1>
                 
-                <div class="control-row">
-                    <div class="control-info">
-                        <span class="ctrl-desc" style="color: var(--cyan); font-weight: 600;">Desktop Push Alerts</span>
+                <!-- Small circular status tags -->
+                <div class="status-tags">
+                    <div class="tag-item">
+                        <div class="tag-circle color-cyan">20%</div>
+                        <span class="tag-label">CPU LOAD</span>
                     </div>
-                    <label class="switch-toggle mini-switch">
-                        <input type="checkbox" id="switch-push-alerts">
-                        <span class="switch-slider"></span>
-                    </label>
-                </div>
-                
-                <div class="control-col" style="margin-top: 4px;">
-                    <span class="ctrl-desc" style="color: var(--amber); font-weight: 600;">Webhook Dispatch Endpoint</span>
-                    <div class="dropdown-wrapper">
-                        <input type="text" id="input-webhook-url" placeholder="https://example.com/webhook" class="custom-select" style="font-size:0.75rem; padding: 8px 12px;">
+                    <div class="tag-item">
+                        <div class="tag-circle color-white">42%</div>
+                        <span class="tag-label">RAM USAGE</span>
+                    </div>
+                    <div class="tag-item">
+                        <div class="tag-circle color-dim">15%</div>
+                        <span class="tag-label">DB LOAD</span>
+                    </div>
+                    <div class="tag-item font-dashed">
+                        <div class="tag-circle color-stripe">SEC</div>
+                        <span class="tag-label">ENCRYPTED</span>
                     </div>
                 </div>
             </div>
 
-            <!-- TARGET LOGIC FILTERS (HIGH SCALE) -->
-            <div class="control-col target-filters-section">
-                <div class="flex-between align-center">
-                    <div class="target-title-wrap">
-                        <span class="ctrl-title">TARGET LOGIC FILTERS</span>
-                        <span class="filter-count-badge" id="filter-active-badge">-- ACTIVE</span>
+            <!-- Top Telemetry Row (Metric indicators on right) -->
+            <div class="top-telemetry">
+                <div class="metric-card card-cyan">
+                    <div class="metric-header">
+                        <span class="metric-label">CRITICAL DETECTIONS</span>
+                        <span class="badge trend-up"><i class="fa-solid fa-arrow-trend-up"></i> +12%</span>
                     </div>
-                </div>
-
-                <!-- Instant Filter Search Input -->
-                <div class="filter-search-wrap">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="filter-search" placeholder="Search 170+ classes instantly...">
-                </div>
-
-                <!-- Grouped / Scrollable Filter List -->
-                <div class="scrollable-filter-container">
-                    <div id="filter-grid" class="dynamic-filter-grid">
-                        <!-- Populated by JavaScript -->
+                    <div class="metric-body">
+                        <span class="metric-number" id="cumulative-counter">0</span>
+                        <span class="metric-sub">Logged events</span>
                     </div>
                 </div>
 
-                <!-- Action Button Row -->
-                <div class="filter-actions-row">
-                    <button id="btn-select-all" class="hud-pill-btn"><i class="fa-solid fa-check-double"></i> ALL</button>
-                    <button id="btn-select-none" class="hud-pill-btn"><i class="fa-solid fa-xmark"></i> CLEAR</button>
-                    <button id="btn-invert" class="hud-pill-btn btn-invert-amber"><i class="fa-solid fa-rotate"></i> INVERT</button>
+                <div class="metric-card card-green">
+                    <div class="metric-header">
+                        <span class="metric-label">FRAME RATE</span>
+                        <span class="badge trend-up"><i class="fa-solid fa-arrow-trend-up"></i> +5%</span>
+                    </div>
+                    <div class="metric-body">
+                        <span class="metric-number" id="fps-display">– FPS</span>
+                        <span class="metric-sub">Camera decode</span>
+                    </div>
                 </div>
-            </div>
 
-            <!-- DATA ACTIONS -->
-            <div class="control-col pt-10 border-top">
-                <span class="ctrl-title mb-8 block">SYSTEM DATA ARCHIVE</span>
-                <div class="action-buttons-grid">
-                    <button id="btn-export-csv-new" class="action-btn btn-glass-cyan">
-                        <i class="fa-solid fa-file-export"></i> EXPORT LOGS (.CSV)
-                    </button>
-                    <button id="btn-export-pdf" class="action-btn btn-glass-cyan">
-                        <i class="fa-solid fa-file-pdf"></i> EXPORT REPORT (PDF)
-                    </button>
-                    <button id="btn-clear-db-new" class="action-btn btn-glass-red">
-                        <i class="fa-solid fa-trash-can"></i> WIPE DATABASE
-                    </button>
+                <div class="metric-card card-red">
+                    <div class="metric-header">
+                        <span class="metric-label">INFERENCE TIME</span>
+                        <span class="badge trend-down"><i class="fa-solid fa-arrow-trend-down"></i> -15%</span>
+                    </div>
+                    <div class="metric-body">
+                        <span class="metric-number" id="latency-display">– ms</span>
+                        <span class="metric-sub">GPU Processing</span>
+                    </div>
                 </div>
             </div>
+        </section>
 
-        </div>
-    </aside>
-</main>
+        <!-- ===================== DASHBOARD MAIN GRID ===================== -->
+        <main class="dashboard-grid">
 
-<!-- ===================== BOTTOM ANALYTICS & LOGS ===================== -->
-<section class="bottom-analytics">
-    <!-- Chart Card -->
-    <div class="analytics-card chart-card">
-        <div class="card-header-row flex-between">
-            <div>
-                <span class="card-title">// DETECTION DISTRIBUTION</span>
-                <span class="card-sub-title">Rolling time-window &amp; top classes</span>
-            </div>
-            <div class="chart-tabs" id="chart-tabs">
-                <button class="chart-tab" data-window="30">30s</button>
-                <button class="chart-tab active" data-window="60">1m</button>
-                <button class="chart-tab" data-window="300">5m</button>
-                <button class="chart-tab" data-window="0">All</button>
-            </div>
-        </div>
-        <!-- Rolling time-window line chart -->
-        <div class="chart-container" style="height:130px; margin-bottom:0;">
-            <canvas id="timeline-chart"></canvas>
-        </div>
-        <!-- Sub-header for bar chart -->
-        <div class="chart-section-divider">
-            <span class="chart-sub-label">TOP CLASSES (ALL-TIME)</span>
-        </div>
-        <!-- All-time frequency bar chart -->
-        <div class="chart-container" style="height:90px;">
-            <canvas id="analytics-chart"></canvas>
-        </div>
-    </div>
+            <!-- ========== LEFT COLUMN: VIEWPORT & TELEMETRY ========== -->
+            <section class="left-column">
+                <!-- Viewport Card -->
+                <div class="viewport-card">
+                    <!-- HUD decorative brackets -->
+                    <div class="bracket tl"></div>
+                    <div class="bracket tr"></div>
+                    <div class="bracket bl"></div>
+                    <div class="bracket br"></div>
 
-    <!-- Table Logs Card -->
-    <div class="analytics-card log-card">
-        <div class="card-header-row flex-between">
-            <span class="card-title">// SYSTEM EVENT LOGGER</span>
-            <div class="log-filters">
-                <div class="table-search">
-                    <i class="fa-solid fa-filter"></i>
-                    <input type="text" id="log-search" placeholder="Class...">
-                </div>
-                <div class="table-search">
-                    <i class="fa-regular fa-clock"></i>
-                    <select id="log-time-filter" class="custom-select">
-                        <option value="all">All Time</option>
-                        <option value="1h">Last 1 Hour</option>
-                        <option value="24h">Last 24 Hours</option>
-                        <option value="7d">Last 7 Days</option>
-                    </select>
-                </div>
-                <div class="table-search">
-                    <i class="fa-solid fa-percent"></i>
-                    <select id="log-conf-filter" class="custom-select">
-                        <option value="0">Any Conf.</option>
-                        <option value="50">&ge; 50% Conf.</option>
-                        <option value="75">&ge; 75% Conf.</option>
-                        <option value="90">&ge; 90% Conf.</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        
-        <div class="table-scroll-wrapper">
-            <table class="dashboard-table">
-                <thead>
-                    <tr>
-                        <th>INCIDENT ID</th>
-                        <th>CLASS CATEGORY</th>
-                        <th>CONFIDENCE SCORE</th>
-                        <th>TIMESTAMP (UTC)</th>
-                        <th>ACTION</th>
-                    </tr>
-                </thead>
-                <tbody id="event-log-tbody">
-                    <tr class="empty-row">
-                        <td colspan="5">
-                            <div class="empty-state">
-                                <i class="fa-solid fa-signature"></i>
-                                <p>Awaiting surveillance detections... Enable sensor tracking above.</p>
+                    <!-- Feed header line -->
+                    <div class="viewport-header">
+                        <div class="live-tag">
+                            <span class="live-dot"></span>
+                            <span>LIVE FEED</span>
+                        </div>
+                        <div class="layout-toggle-wrap">
+                            <button class="layout-btn active" id="btn-layout-single" title="Single Feed Monitor">
+                                <i class="fa-solid fa-square"></i> SINGLE
+                            </button>
+                            <button class="layout-btn" id="btn-layout-grid" title="Grid Multi-Feed Monitor">
+                                <i class="fa-solid fa-table-cells-large"></i> GRID
+                            </button>
+                        </div>
+                        <span class="feed-id" id="feed-id-display">// CAMERA_INPUT_01</span>
+                    </div>
+
+                    <!-- Webcam & Overlay Area -->
+                    <div class="viewport-container" id="viewport">
+                        <!-- Grid scanning line -->
+                        <div class="viewport-scanline"></div>
+
+                        <!-- Model Loading Overlay -->
+                        <div class="vp-overlay" id="loading-overlay">
+                            <div class="vp-overlay-content">
+                                <div class="spinner-icon">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                                </div>
+                                <h3 class="overlay-title" id="loading-title">INITIALIZING NEURAL NET</h3>
+                                <p class="overlay-desc" id="loading-desc">Loading COCO-SSD weights...</p>
+                                <div class="progress-bar-wrap">
+                                    <div class="progress-bar-fill" id="progress-fill"></div>
+                                </div>
                             </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                        </div>
+
+                        <!-- Standby Screen (Subtle Matrix background grid) -->
+                        <div class="vp-standby" id="vp-standby">
+                            <div class="standby-grid-overlay"></div>
+                            <div class="standby-scan"></div>
+                            <div class="standby-content">
+                                <div class="standby-logo">
+                                    <i class="fa-solid fa-shield-halved"></i>
+                                </div>
+                                <h2 class="standby-title">SENSOR STANDBY</h2>
+                                <p class="standby-subtitle">Toggle SENSOR POWER on the panel to begin tracking</p>
+                            </div>
+                        </div>
+
+                        <!-- Drawing overlay toolbar -->
+                        <div class="drawing-toolbar" id="drawing-toolbar">
+                            <button class="draw-tool-btn active" id="tool-none" title="Normal Monitor Mode">
+                                <i class="fa-solid fa-mouse-pointer"></i>
+                            </button>
+                            <button class="draw-tool-btn" id="tool-tripwire" title="Draw Tripwire Line">
+                                <i class="fa-solid fa-arrows-left-right-to-line"></i>
+                            </button>
+                            <button class="draw-tool-btn" id="tool-zone" title="Draw Exclusion Zone">
+                                <i class="fa-solid fa-vector-square"></i>
+                            </button>
+                            <button class="draw-tool-btn" id="tool-heatmap" title="Toggle Heatmap Overlay">
+                                <i class="fa-solid fa-fire"></i>
+                            </button>
+                            <button class="draw-tool-btn btn-clear-draw" id="tool-clear" title="Clear All Boundaries">
+                                <i class="fa-solid fa-eraser"></i>
+                            </button>
+                        </div>
+
+                        <!-- Detection Alert Strip -->
+                        <div class="detection-alert-strip hide" id="detection-alert-banner">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span id="alert-banner-text">TARGET ACQUIRED // LOCK CONFIRMED</span>
+                        </div>
+
+                        <!-- REC status pill -->
+                        <div class="rec-badge" id="rec-badge">
+                            <span class="rec-dot"></span> SECURE REC
+                        </div>
+
+                        <!-- Camera Grid Viewports -->
+                        <div class="camera-grid" id="camera-grid">
+                            <!-- Feed 1 -->
+                            <div class="cam-feed active" id="feed-container-1" data-index="0">
+                                <video id="webcam-1" autoplay playsinline muted></video>
+                                <canvas id="hud-overlay-1"></canvas>
+                                <div class="cam-feed-label">CAM 01 // SELECTED SOURCE</div>
+                            </div>
+                            <!-- Feed 2 -->
+                            <div class="cam-feed" id="feed-container-2" data-index="1">
+                                <video id="webcam-2" autoplay playsinline muted></video>
+                                <canvas id="hud-overlay-2"></canvas>
+                                <div class="cam-feed-label">CAM 02 // THERMAL INFRARED</div>
+                            </div>
+                            <!-- Feed 3 -->
+                            <div class="cam-feed" id="feed-container-3" data-index="2">
+                                <video id="webcam-3" autoplay playsinline muted></video>
+                                <canvas id="hud-overlay-3"></canvas>
+                                <div class="cam-feed-label">CAM 03 // NIGHT VISION</div>
+                            </div>
+                            <!-- Feed 4 -->
+                            <div class="cam-feed" id="feed-container-4" data-index="3">
+                                <video id="webcam-4" autoplay playsinline muted></video>
+                                <canvas id="hud-overlay-4"></canvas>
+                                <div class="cam-feed-label">CAM 04 // RETRO SURVEILLANCE</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Telemetry summary footer -->
+                    <div class="viewport-footer">
+                        <div class="footer-stat">
+                            <span class="f-label">ACTIVE CHANNELS</span>
+                            <span class="f-value pg-val" id="active-channels-count">1 Active / 4 Total</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="footer-stat">
+                            <span class="f-label">ENGINE STATUS</span>
+                            <span class="status-badge" id="model-status-badge">
+                                <span class="status-dot green"></span> ONLINE
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========== RIGHT COLUMN: SIDEBAR CONTROLS ========== -->
+            <aside class="right-column">
+
+                <!-- DIAGNOSTIC STATS CARD -->
+                <div class="panel-card diagnostic-card">
+                    <div class="card-title">// DIAGNOSTIC INTEGRITY</div>
+                    <div class="diag-matrix">
+                        <div class="matrix-item">
+                            <span class="m-label">SENSOR STATE</span>
+                            <span class="m-value text-amber" id="diag-sensor-state">STANDBY</span>
+                        </div>
+                        <div class="matrix-item">
+                            <span class="m-label">ACTIVE ALARM TARGET</span>
+                            <span class="m-value text-cyan" id="diag-alarm-target">ALL</span>
+                        </div>
+                        <div class="matrix-item">
+                            <span class="m-label">AUDIO SYNTH</span>
+                            <span class="m-value text-orange" id="diag-synth-status">ONLINE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTROLS CARD -->
+                <div class="panel-card controls-card">
+                    <div class="card-title">// SENSOR SYSTEM PARAMETERS</div>
+
+                    <!-- Sensor Power Switch -->
+                    <div class="control-row">
+                        <div class="control-info">
+                            <span class="ctrl-title">SENSOR POWER</span>
+                            <span class="ctrl-desc">Enable core webcam tracking pipeline</span>
+                        </div>
+                        <label class="switch-toggle">
+                            <input type="checkbox" id="switch-sensor-power-new">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <!-- Hidden refs for script compatibility -->
+                    <div id="btn-camera-power-text" style="display:none"></div>
+
+                    <!-- Input Dropdown -->
+                    <div class="control-col">
+                        <span class="ctrl-title">SELECT INPUT SOURCE</span>
+                        <div class="dropdown-wrapper">
+                            <select id="select-camera" class="custom-select">
+                                <option value="">Querying input devices...</option>
+                            </select>
+                            <i class="fa-solid fa-chevron-down caret-icon"></i>
+                        </div>
+                    </div>
+
+                    <!-- Threshold Slider -->
+                    <div class="control-col">
+                        <div class="flex-between">
+                            <span class="ctrl-title">DETECTION THRESHOLD</span>
+                            <span class="ctrl-value text-cyan" id="stat-threshold">65%</span>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" id="slider-threshold-new" min="40" max="95" value="65" class="custom-range range-cyan">
+                            <div class="range-labels">
+                                <span>40%</span><span>65%</span><span>95%</span>
+                            </div>
+                        </div>
+                        <!-- Hidden refs for script compatibility -->
+                        <div id="dial-tooltip" style="display:none">65%</div>
+                    </div>
+
+                    <!-- Sound Alarm & Volume -->
+                    <div class="control-col">
+                        <div class="flex-between">
+                            <span class="ctrl-title">AUDIO SIREN ALARM</span>
+                            <label class="switch-toggle mini-switch">
+                                <input type="checkbox" id="switch-sound-alarm" checked>
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                        <div class="volume-slider-wrap">
+                            <span class="ctrl-desc">Volume</span>
+                            <div class="slider-container">
+                                <input type="range" id="slider-volume" min="5" max="100" value="50" class="custom-range range-amber">
+                                <div class="flex-between font-mono-small">
+                                    <span>MIN</span>
+                                    <span id="val-volume-new">50%</span>
+                                    <span>MAX</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Hidden ref for script compatibility -->
+                    <button id="btn-deposit-siren" style="display:none"></button>
+
+                    <!-- TARGET LOGIC FILTERS (HIGH SCALE) -->
+                    <div class="control-col target-filters-section">
+                        <div class="flex-between align-center">
+                            <div class="target-title-wrap">
+                                <span class="ctrl-title">TARGET LOGIC FILTERS</span>
+                                <span class="filter-count-badge" id="filter-active-badge">-- ACTIVE</span>
+                            </div>
+                        </div>
+
+                        <!-- Instant Filter Search Input -->
+                        <div class="filter-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="filter-search" placeholder="Search 170+ classes instantly...">
+                        </div>
+
+                        <!-- Grouped / Scrollable Filter List -->
+                        <div class="scrollable-filter-container">
+                            <div id="filter-grid" class="dynamic-filter-grid">
+                                <!-- Populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <!-- Action Button Row -->
+                        <div class="filter-actions-row">
+                            <button id="btn-select-all" class="hud-pill-btn"><i class="fa-solid fa-check-double"></i> ALL</button>
+                            <button id="btn-select-none" class="hud-pill-btn"><i class="fa-solid fa-xmark"></i> CLEAR</button>
+                            <button id="btn-invert" class="hud-pill-btn btn-invert-amber"><i class="fa-solid fa-rotate"></i> INVERT</button>
+                        </div>
+                    </div>
+
+                </div>
+            </aside>
+        </main>
     </div>
-</section>
+
+    <!-- ========== 3. INCIDENTS VIEW ========== -->
+    <div id="view-incidents" class="view-section">
+        <main class="incidents-fullscreen-layout">
+            <!-- Table Logs Card -->
+            <div class="analytics-card log-card fullscreen-card">
+                <div class="card-header-row flex-between">
+                    <span class="card-title">// SECURITY EVENT DATABASE</span>
+                    <div class="log-filters">
+                        <div class="table-search">
+                            <i class="fa-solid fa-filter"></i>
+                            <input type="text" id="log-search" placeholder="Class...">
+                        </div>
+                        <div class="table-search">
+                            <i class="fa-regular fa-clock"></i>
+                            <select id="log-time-filter" class="custom-select">
+                                <option value="all">All Time</option>
+                                <option value="1h">Last 1 Hour</option>
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                            </select>
+                        </div>
+                        <div class="table-search">
+                            <i class="fa-solid fa-percent"></i>
+                            <select id="log-conf-filter" class="custom-select">
+                                <option value="0">Any Conf.</option>
+                                <option value="50">&ge; 50% Conf.</option>
+                                <option value="75">&ge; 75% Conf.</option>
+                                <option value="90">&ge; 90% Conf.</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-scroll-wrapper">
+                    <table class="dashboard-table">
+                        <thead>
+                            <tr>
+                                <th>INCIDENT ID</th>
+                                <th>CLASS CATEGORY</th>
+                                <th>CONFIDENCE SCORE</th>
+                                <th>TIMESTAMP (UTC)</th>
+                                <th>ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="event-log-tbody">
+                            <tr class="empty-row">
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <i class="fa-solid fa-signature"></i>
+                                        <p>Awaiting surveillance detections... Enable sensor tracking in Live Feed.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ========== 4. METRICS VIEW ========== -->
+    <div id="view-metrics" class="view-section">
+        <main class="metrics-fullscreen-layout">
+            <!-- Chart Card -->
+            <div class="analytics-card chart-card fullscreen-card">
+                <div class="card-header-row flex-between">
+                    <div>
+                        <span class="card-title">// SYSTEM TELEMETRY & PERFORMANCE</span>
+                        <span class="card-sub-title">Rolling inference times, class stats, and database size</span>
+                    </div>
+                    <div class="chart-tabs" id="chart-tabs">
+                        <button class="chart-tab" data-window="30">30s</button>
+                        <button class="chart-tab active" data-window="60">1m</button>
+                        <button class="chart-tab" data-window="300">5m</button>
+                        <button class="chart-tab" data-window="0">All</button>
+                    </div>
+                </div>
+                <!-- Rolling time-window line chart -->
+                <div class="chart-container" style="height:250px; margin-bottom:24px;">
+                    <canvas id="timeline-chart"></canvas>
+                </div>
+                <!-- Sub-header for bar chart -->
+                <div class="chart-section-divider">
+                    <span class="chart-sub-label">TOP DETECTED CLASSES (ALL-TIME SURVEILLANCE LOAD)</span>
+                </div>
+                <!-- All-time frequency bar chart -->
+                <div class="chart-container" style="height:180px;">
+                    <canvas id="analytics-chart"></canvas>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ========== 5. DIAGNOSTICS VIEW ========== -->
+    <div id="view-diagnostics" class="view-section">
+        <main class="diagnostics-fullscreen-layout">
+            <div class="diag-split-grid">
+                <!-- System Config and Webhook Parameters -->
+                <div class="panel-card config-panel">
+                    <div class="card-title">// INTEGRITY & COMMUNICATIONS HUB</div>
+                    
+                    <!-- Webhook Settings -->
+                    <div class="control-col target-filters-section" style="margin-top: 16px;">
+                        <span class="ctrl-title mb-4 block" style="font-size: 1.1rem; color: #fff;">Alert Dispatches</span>
+                        
+                        <div class="control-row" style="padding: 16px 0; border-bottom: 1px solid var(--border-glass)">
+                            <div class="control-info">
+                                <span class="ctrl-title">Desktop Notifications</span>
+                                <span class="ctrl-desc">Trigger standard HTML5 system alert push dialogs</span>
+                            </div>
+                            <label class="switch-toggle">
+                                <input type="checkbox" id="switch-push-alerts">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="control-col" style="margin-top: 16px;">
+                            <span class="ctrl-title" style="color: var(--cyan)">HTTP Webhook Endpoint</span>
+                            <span class="ctrl-desc" style="margin-bottom: 8px;">Forwards JSON payloads of alarms to third-party endpoints</span>
+                            <div class="dropdown-wrapper">
+                                <input type="text" id="input-webhook-url" placeholder="https://example.com/webhook" class="custom-select" style="font-family: var(--font-mono)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Data Actions -->
+                    <div class="control-col pt-10 border-top" style="margin-top: 24px;">
+                        <span class="ctrl-title mb-8 block" style="font-size: 1.1rem; color: #fff;">Data Export Pipeline</span>
+                        <div class="action-buttons-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                            <button id="btn-export-csv-new" class="action-btn btn-glass-cyan">
+                                <i class="fa-solid fa-file-export"></i> EXPORT LOGS (.CSV)
+                            </button>
+                            <button id="btn-export-pdf" class="action-btn btn-glass-cyan">
+                                <i class="fa-solid fa-file-pdf"></i> EXPORT REPORT (PDF)
+                            </button>
+                            <button id="btn-clear-db-new" class="action-btn btn-glass-red">
+                                <i class="fa-solid fa-trash-can"></i> WIPE SYSTEM DATABASE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Diagnostics Terminal Monitor -->
+                <div class="panel-card terminal-panel">
+                    <div class="card-title">// SECURE SENTINEL STACKS & METADATA</div>
+                    <div class="terminal-body" id="diag-terminal-log">
+                        <div class="term-line"><span class="term-time">[13:00:00]</span> SYSTEM DEPLOYED ON LOCALHOST NODE // ENCRYPTION ACTIVE</div>
+                        <div class="term-line"><span class="term-time">[13:00:02]</span> WEBCAM QUERY SCANNING INITIALIZED</div>
+                        <div class="term-line"><span class="term-time">[13:00:03]</span> READY FOR INPUT ACQUISITION</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+</div>
 
 <!-- ===================== GLASSMORPHIC INCIDENT MODAL ===================== -->
 <div class="clip-modal hide" id="clip-modal">

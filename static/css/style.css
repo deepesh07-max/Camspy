@@ -1936,3 +1936,338 @@ body {
         padding: 16px;
     }
 }
+
+/* ==========================================================================
+   MULTI-VIEW TAB VIEW CONTAINER SYSTEM
+   ========================================================================== */
+.view-section {
+    display: none;
+    animation: fadeInView 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.view-section.active {
+    display: block;
+}
+
+@keyframes fadeInView {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   CASHMATE-STYLE OVERVIEW DASHBOARD
+   ========================================================================== */
+.overview-metrics-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    padding: 24px 32px;
+}
+
+.cashmate-metric-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: var(--transition);
+}
+
+.cashmate-metric-card:hover {
+    border-color: rgba(255, 255, 255, 0.08);
+    transform: translateY(-2px);
+}
+
+.cm-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.cm-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #64748b;
+}
+
+.cm-trend {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+}
+
+.cm-trend.positive {
+    background: var(--green-dim);
+    color: var(--green);
+}
+
+.cm-trend.negative {
+    background: var(--red-dim);
+    color: var(--red);
+}
+
+.cm-card-value {
+    font-family: var(--font-display);
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 16px;
+    letter-spacing: -0.01em;
+}
+
+.cashmate-metric-card.color-purple .cm-card-value {
+    color: #c084fc;
+    text-shadow: 0 0 16px rgba(192, 132, 252, 0.2);
+}
+.cashmate-metric-card.color-red .cm-card-value {
+    color: var(--red);
+    text-shadow: 0 0 16px rgba(244, 63, 94, 0.2);
+}
+.cashmate-metric-card.color-green .cm-card-value {
+    color: var(--green);
+    text-shadow: 0 0 16px rgba(16, 185, 129, 0.2);
+}
+
+.cm-mini-bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    height: 50px;
+    margin-bottom: 12px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cm-bar-wrap {
+    flex: 1;
+    background: rgba(192, 132, 252, 0.15);
+    border-radius: 3px 3px 0 0;
+    position: relative;
+    cursor: pointer;
+    min-height: 4px;
+    transition: var(--transition);
+}
+
+.cm-bar-wrap:hover {
+    background: #c084fc;
+    box-shadow: 0 0 8px #c084fc;
+}
+
+.day-lbl {
+    display: none;
+}
+
+.cm-mini-chart-canvas-wrap {
+    height: 50px;
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.cm-sub {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: #475569;
+    text-transform: uppercase;
+}
+
+/* Overview Layout Grid */
+.overview-grid {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 24px;
+    padding: 0 32px 32px 32px;
+}
+
+.cashmate-panel-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+}
+
+.cm-panel-header {
+    margin-bottom: 24px;
+}
+
+.cm-panel-title {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
+.cm-transactions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.cm-transaction-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-md);
+    transition: var(--transition);
+}
+
+.cm-transaction-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.cm-icon-circle {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+}
+
+.cm-icon-circle.bg-purple { background: rgba(192, 132, 252, 0.15); color: #c084fc; }
+.cm-icon-circle.bg-yellow { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+.cm-icon-circle.bg-blue { background: rgba(59, 130, 246, 0.15); color: var(--blue); }
+.cm-icon-circle.bg-red { background: rgba(244, 63, 94, 0.15); color: var(--red); }
+.cm-icon-circle.bg-green { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+
+.cm-tx-details {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.cm-tx-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.cm-tx-date {
+    font-size: 0.7rem;
+    color: #475569;
+    margin-top: 2px;
+}
+
+.cm-tx-amount {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.cm-tx-amount.positive { color: var(--green); }
+.cm-tx-amount.negative { color: #f1f5f9; }
+
+.cm-chart-selectors {
+    display: flex;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 2px;
+    border-radius: 99px;
+}
+
+.cm-sel-btn {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 99px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.cm-sel-btn:hover {
+    color: #fff;
+}
+
+.cm-sel-btn.active {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.cm-large-chart-container {
+    height: 380px;
+    position: relative;
+    width: 100%;
+}
+
+/* Fullscreen Views Layouts */
+.incidents-fullscreen-layout,
+.metrics-fullscreen-layout,
+.diagnostics-fullscreen-layout {
+    padding: 24px 32px;
+}
+
+.analytics-card.fullscreen-card {
+    height: calc(100vh - 160px);
+    display: flex;
+    flex-direction: column;
+}
+
+.fullscreen-card .table-scroll-wrapper {
+    flex: 1;
+    max-height: none;
+}
+
+/* Diagnostics Split Grid */
+.diag-split-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.config-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+}
+
+.terminal-panel {
+    background: #000;
+    border: 1px solid rgba(0, 255, 213, 0.1);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    font-family: var(--font-mono);
+    box-shadow: inset 0 0 20px rgba(0, 255, 213, 0.03);
+}
+
+.terminal-body {
+    height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.term-line {
+    font-size: 0.75rem;
+    color: #00ffd5;
+    line-height: 1.4;
+}
+
+.term-time {
+    color: #475569;
+    margin-right: 8px;
+}
