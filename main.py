@@ -1,18 +1,38 @@
 import csv
 import io
 import json
+import base64
+import os
+import urllib.request
 from datetime import datetime
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 
 import models
 from database import engine, get_db
 
+# Create static directories on launch
+os.makedirs("static/clips", exist_ok=True)
+
 # Auto-create all required database tables on app launch
 models.Base.metadata.create_all(bind=engine)
+
+# Dynamic table migration — add clip_url column if it doesn't already exist
+# Uses text() wrapper required by SQLAlchemy 2.x
+try:
+    with engine.begin() as conn:
+        existing = conn.execute(
+            text("PRAGMA table_info(detection_events)")
+        ).fetchall()
+        col_names = [row[1] for row in existing]
+        if "clip_url" not in col_names:
+            conn.execute(text("ALTER TABLE detection_events ADD COLUMN clip_url VARCHAR;"))
+            print("[migration] Added clip_url column to detection_events.")
+except Exception as e:
+    print(f"[migration] Skipped clip_url migration: {e}")
 
 app = FastAPI(
     title="CamSpy - Object Detection Sensor Hub",
@@ -50,16 +70,34 @@ def get_events(limit: int = 100, db: Session = Depends(get_db)):
     return [event.to_dict() for event in events]
 
 
-@app.post("/api/events")
-async def create_event(request: Request, db: Session = Depends(get_db)):
+def send_webhook_async(webhook_url: str, payload: dict):
     """
-    Logs a newly detected sensor event to the SQLite database.
+    Sends a JSON POST request to a user-configured Webhook endpoint.
+    """
+    try:
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            pass
+    except Exception as e:
+        print(f"Webhook relay failed for target {webhook_url}: {e}")
+
+
+@app.post("/api/events")
+async def create_event(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Logs a newly detected sensor event to the SQLite database and relays webhooks.
     """
     try:
         data = await request.json()
         label = data.get("label")
         confidence = data.get("confidence")
         bbox = data.get("bbox")  # Expecting list/dict, will convert to JSON string
+        webhook_url = data.get("webhook_url")
 
         if not label or confidence is None:
             raise HTTPException(status_code=400, detail="Missing required fields: label and confidence")
@@ -79,24 +117,77 @@ async def create_event(request: Request, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_event)
 
+        event_dict = new_event.to_dict()
+
+        # Asynchronously forward trigger alerts to active webhook URL
+        if webhook_url:
+            webhook_payload = {
+                "event": "detection",
+                "incident_id": new_event.id,
+                "label": new_event.label,
+                "confidence": round(new_event.confidence, 4),
+                "timestamp": event_dict["timestamp"],
+                "bbox": bbox
+            }
+            background_tasks.add_task(send_webhook_async, webhook_url, webhook_payload)
+
         return JSONResponse(
             status_code=201,
-            content={"status": "success", "event": new_event.to_dict()}
+            content={"status": "success", "event": event_dict}
         )
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database logging failure: {str(e)}")
 
 
+@app.post("/api/events/{event_id}/clip")
+async def upload_event_clip(event_id: int, request: Request, db: Session = Depends(get_db)):
+    """
+    Decodes base64 incident clips and writes WebM video files to server disk.
+    """
+    event = db.query(models.DetectionEvent).filter(models.DetectionEvent.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event log not found")
+    try:
+        data = await request.json()
+        clip_base64 = data.get("clip_b64") or data.get("clip")  # support both keys
+        if not clip_base64:
+            raise HTTPException(status_code=400, detail="Missing clip base64 data (clip_b64)")
+        
+        if "," in clip_base64:
+            clip_base64 = clip_base64.split(",")[1]
+            
+        clip_bytes = base64.b64decode(clip_base64)
+        file_path = f"static/clips/incident_{event_id}.webm"
+        with open(file_path, "wb") as f:
+            f.write(clip_bytes)
+            
+        event.clip_url = f"/static/clips/incident_{event_id}.webm"
+        db.commit()
+        return {"status": "success", "clip_url": event.clip_url}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to save clip: {str(e)}")
+
+
 @app.delete("/api/events/{event_id}")
 def delete_event(event_id: int, db: Session = Depends(get_db)):
     """
-    Deletes an individual event log entry by its primary key.
+    Deletes an individual event log entry and deletes its linked video clip.
     """
     event = db.query(models.DetectionEvent).filter(models.DetectionEvent.id == event_id).first()
     if not event:
         raise HTTPException(status_code=444, detail="Event log not found")
     
+    # Wipe the linked video file off server disk
+    if event.clip_url:
+        local_path = event.clip_url.lstrip("/")
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except Exception as e:
+                print(f"Failed to delete clip file {local_path}: {e}")
+
     db.delete(event)
     db.commit()
     return {"status": "success", "message": f"Event {event_id} deleted."}

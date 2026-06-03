@@ -1735,6 +1735,154 @@ body {
     color: #475569;
 }
 
+/* Glassmorphic Modal Overlay */
+.clip-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 5, 9, 0.85);
+    backdrop-filter: blur(12px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease;
+}
+.clip-modal.hide {
+    display: none !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Modal Content Dialog Box */
+.clip-modal-content {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hi);
+    box-shadow: 0 0 25px rgba(0, 255, 213, 0.15);
+    border-radius: var(--radius-lg);
+    width: 600px;
+    max-width: 90%;
+    padding: 24px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    transform: translateY(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.clip-modal-header {
+    border-bottom: 1px solid var(--border-glass);
+    padding-bottom: 12px;
+}
+.modal-title {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: #fff;
+    text-shadow: var(--cyan-glow);
+}
+.modal-close-btn {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #64748b;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.modal-close-btn:hover {
+    color: var(--red);
+}
+
+/* Video Player Box inside Modal */
+.video-container-modal {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border-glass);
+}
+.video-container-modal video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.video-loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 9, 14, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    z-index: 10;
+}
+.video-loading-overlay i {
+    font-size: 1.8rem;
+    color: var(--cyan);
+}
+.video-loading-overlay span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: #64748b;
+    letter-spacing: 0.1em;
+}
+.video-loading-overlay.hide {
+    display: none !important;
+}
+
+.clip-modal-footer {
+    border-top: 1px solid var(--border-glass);
+    padding-top: 12px;
+}
+.clip-info {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+/* Buttons in Table Cell */
+.action-buttons-cell {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    align-items: center;
+}
+
+.btn-review-clip {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--cyan);
+    cursor: pointer;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    transition: var(--transition);
+}
+.btn-review-clip:hover {
+    border-color: rgba(0, 255, 213, 0.25);
+    background: var(--cyan-dim);
+    box-shadow: var(--cyan-glow);
+}
+.btn-review-clip.recording {
+    color: var(--amber);
+    animation: clip-pulse-rec 1.2s ease-in-out infinite alternate;
+}
+@keyframes clip-pulse-rec {
+    0% { opacity: 0.4; }
+    100% { opacity: 1.0; box-shadow: var(--amber-glow); }
+}
+
 /* ==========================================================================
    RESPONSIVE DESIGN INTERFACE MEDIA
    ========================================================================== */

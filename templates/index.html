@@ -358,6 +358,28 @@
             <!-- Hidden ref for script compatibility -->
             <button id="btn-deposit-siren" style="display:none"></button>
 
+            <!-- WEBHOOK & PUSH ALERTS PANEL -->
+            <div class="control-col target-filters-section">
+                <span class="ctrl-title mb-4 block">WEBHOOK &amp; PUSH ALERTS</span>
+                
+                <div class="control-row">
+                    <div class="control-info">
+                        <span class="ctrl-desc" style="color: var(--cyan); font-weight: 600;">Desktop Push Alerts</span>
+                    </div>
+                    <label class="switch-toggle mini-switch">
+                        <input type="checkbox" id="switch-push-alerts">
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+                
+                <div class="control-col" style="margin-top: 4px;">
+                    <span class="ctrl-desc" style="color: var(--amber); font-weight: 600;">Webhook Dispatch Endpoint</span>
+                    <div class="dropdown-wrapper">
+                        <input type="text" id="input-webhook-url" placeholder="https://example.com/webhook" class="custom-select" style="font-size:0.75rem; padding: 8px 12px;">
+                    </div>
+                </div>
+            </div>
+
             <!-- TARGET LOGIC FILTERS (HIGH SCALE) -->
             <div class="control-col target-filters-section">
                 <div class="flex-between align-center">
@@ -490,6 +512,39 @@
         </div>
     </div>
 </section>
+
+<!-- ===================== GLASSMORPHIC INCIDENT MODAL ===================== -->
+<div class="clip-modal hide" id="clip-modal">
+    <div class="clip-modal-content">
+        <!-- HUD decorative brackets -->
+        <div class="bracket tl"></div>
+        <div class="bracket tr"></div>
+        <div class="bracket bl"></div>
+        <div class="bracket br"></div>
+
+        <div class="clip-modal-header flex-between">
+            <span class="modal-title">// INCIDENT RECORDING REVIEW</span>
+            <button class="modal-close-btn" id="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="clip-modal-body">
+            <div class="video-container-modal">
+                <video id="modal-video" controls autoplay playsinline></video>
+                <div class="video-loading-overlay hide" id="modal-video-loading">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    <span>FETCHING FOOTAGE...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="clip-modal-footer flex-between">
+            <span class="clip-info" id="modal-clip-info">INCIDENT #0000 // AWAITING STREAM</span>
+            <a href="#" class="action-btn btn-glass-cyan" id="modal-download" download="incident_clip.webm">
+                <i class="fa-solid fa-download"></i> DOWNLOAD WEBMS
+            </a>
+        </div>
+    </div>
+</div>
 
 <!-- System hidden variables for tracking states (compatibility backup) -->
 <span id="val-fps-new" style="display:none"></span>

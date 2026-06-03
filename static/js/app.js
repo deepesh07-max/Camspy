@@ -180,6 +180,13 @@ document.addEventListener("DOMContentLoaded", () => {
         ],
         tempPoint:      null,     // { x, y } (normalized) during line drawing
         activeCamIndex: 0,
+
+        // Clip Recorder state — per-camera rolling pre-buffer + trigger tracking
+        recordingEvents:    new Set(),   // Set of eventIds currently recording post-clip
+        canvasRecorders:    [null, null, null, null],  // MediaRecorder per camera slot
+        preBuffers:         [[], [], [], []],           // Rolling 2-second chunk arrays
+        pushEnabled:        false,
+        webhookUrl:         "",
     };
 
     const ctxs = el.canvases.map(c => c.getContext("2d"));
@@ -533,14 +540,26 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch(e) { console.error("loadLogs:", e); }
     }
 
-    async function postEvent(label, confidence, bbox) {
+    async function postEvent(label, confidence, bbox, camIndex = null) {
+        const webhookUrl = state.webhookUrl || "";
         try {
             const r = await fetch("/api/events", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ label, confidence, bbox })
+                body: JSON.stringify({ label, confidence, bbox, webhook_url: webhookUrl })
             });
-            if (r.ok) loadLogs();
+            if (r.ok) {
+                const res = await r.json();
+                const eventId = res.event.id;
+                // Fire push notification if enabled and page is hidden
+                if (state.pushEnabled) {
+                    sendPushNotification(label, confidence);
+                }
+                await loadLogs();
+                if (camIndex !== null) {
+                    triggerClipRecordingAndUpload(eventId, camIndex);
+                }
+            }
         } catch(e) { console.error("postEvent:", e); }
     }
 
@@ -601,6 +620,17 @@ document.addEventListener("DOMContentLoaded", () => {
             else if (log.confidence < 0.75) barColor = "var(--amber)";
             else                             barColor = "var(--green)";
 
+            // Check review clip state
+            const isRecording = state.recordingEvents && state.recordingEvents.has(log.id);
+            let reviewBtnHtml = "";
+            if (log.clip_url) {
+                reviewBtnHtml = `<button class="btn-review-clip" data-id="${log.id}" title="Review Incident Video clip"><i class="fa-solid fa-play"></i></button>`;
+            } else if (isRecording) {
+                reviewBtnHtml = `<button class="btn-review-clip recording" data-id="${log.id}" title="Recording video clip..."><i class="fa-solid fa-spinner fa-spin"></i></button>`;
+            } else {
+                reviewBtnHtml = `<button class="btn-review-clip" style="opacity: 0.25; cursor: not-allowed;" title="No clip recorded"><i class="fa-solid fa-video-slash"></i></button>`;
+            }
+
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td>#${String(log.id).padStart(4,"0")}</td>
@@ -612,8 +642,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 </td>
                 <td>${ts}</td>
-                <td><button class="btn-delete-row" data-id="${log.id}"><i class="fa-solid fa-trash-can"></i></button></td>
+                <td>
+                    <div class="action-buttons-cell">
+                        ${reviewBtnHtml}
+                        <button class="btn-delete-row" data-id="${log.id}"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </td>
             `;
+            const reviewBtn = tr.querySelector(".btn-review-clip");
+            if (reviewBtn && log.clip_url) {
+                reviewBtn.addEventListener("click", () => openClipModal(log));
+            }
             tr.querySelector(".btn-delete-row").addEventListener("click", () => deleteEvent(log.id));
             el.logTbody.appendChild(tr);
         });
@@ -757,6 +796,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 state.active = true;
                 setPowerUI(true);
 
+                // Start rolling pre-buffer recorders on all canvas streams
+                initMediaRecorders();
+
                 if (el.recBadge) el.recBadge.classList.add("active");
                 if (el.vpStandby) el.vpStandby.classList.add("hide");
                 if (el.diagSensorState) {
@@ -783,6 +825,15 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
         state.streams = [];
+
+        // Stop rolling pre-buffer recorders
+        state.canvasRecorders.forEach((rec, idx) => {
+            if (rec && rec.state !== "inactive") {
+                try { rec.stop(); } catch(_) {}
+            }
+            state.canvasRecorders[idx] = null;
+            state.preBuffers[idx] = [];
+        });
 
         el.webcams.forEach(w => {
             w.srcObject = null;
@@ -979,7 +1030,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const lastKey = `${camIndex}_${h.class}`;
                 const last = state.lastLogged.get(lastKey) || 0;
                 if (now - last > state.cooldown || !state.prevSet.has(lastKey)) {
-                    postEvent(`[CAM 0${camIndex+1}] ${h.class}`, h.score, h.bbox);
+                    postEvent(`[CAM 0${camIndex+1}] ${h.class}`, h.score, h.bbox, camIndex);
                     state.lastLogged.set(lastKey, now);
                 }
             });
@@ -1163,6 +1214,297 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.fillText(`TRIPWIRE 0${tIdx+1}`, Math.min(tx1, tx2) + 5, Math.min(ty1, ty2) - 5);
             ctx.restore();
         });
+    }
+
+    /* -------------------------------------------------------
+       MEDIA RECORDER — ROLLING PRE-BUFFER + TRIGGERED CLIP
+     ------------------------------------------------------- */
+
+    /**
+     * Starts a rolling MediaRecorder on each active canvas stream.
+     * Chunks are kept in state.preBuffers[camIndex], capped to ~2 seconds.
+     * This runs silently in the background once cameras go active.
+     */
+    function initMediaRecorders() {
+        const PRE_BUFFER_MS = 2200; // slightly over 2 s to guarantee 2s of footage
+        const MIME = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+            ? "video/webm;codecs=vp9"
+            : "video/webm";
+
+        el.canvases.forEach((canvas, idx) => {
+            // Tear down any previous recorder for this slot
+            if (state.canvasRecorders[idx]) {
+                try { state.canvasRecorders[idx].stop(); } catch(_) {}
+                state.canvasRecorders[idx] = null;
+            }
+            state.preBuffers[idx] = [];
+
+            let stream;
+            try {
+                stream = canvas.captureStream(15); // 15 fps is plenty for evidence
+            } catch(e) {
+                console.warn(`captureStream not available on canvas[${idx}]:`, e);
+                return;
+            }
+
+            let rec;
+            try {
+                rec = new MediaRecorder(stream, { mimeType: MIME, videoBitsPerSecond: 800_000 });
+            } catch(e) {
+                console.warn(`MediaRecorder creation failed for canvas[${idx}]:`, e);
+                return;
+            }
+
+            rec.ondataavailable = e => {
+                if (!e.data || e.data.size === 0) return;
+                const buf = state.preBuffers[idx];
+                buf.push({ ts: Date.now(), blob: e.data });
+                // Prune chunks older than PRE_BUFFER_MS
+                const cutoff = Date.now() - PRE_BUFFER_MS;
+                while (buf.length && buf[0].ts < cutoff) buf.shift();
+            };
+
+            rec.start(250); // request a chunk every 250 ms for fine-grained rolling
+            state.canvasRecorders[idx] = rec;
+        });
+    }
+
+    /**
+     * Called immediately after an event is POSTed.
+     * Waits 3 seconds for post-trigger footage then splices in the
+     * pre-buffer chunks to form a ~5-second WebM clip.
+     * Encodes it as Base64 and uploads to /api/events/{eventId}/clip.
+     */
+    async function triggerClipRecordingAndUpload(eventId, camIndex) {
+        const MIME = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+            ? "video/webm;codecs=vp9"
+            : "video/webm";
+        const POST_RECORD_MS = 3000;
+
+        // Mark event as recording (shows spinner in table)
+        state.recordingEvents.add(eventId);
+        renderTable(state.logs);
+
+        // Capture a snapshot of pre-buffer chunks from before the trigger
+        const priorChunks = (state.preBuffers[camIndex] || []).map(b => b.blob);
+
+        // Start a fresh temporary recorder to gather post-trigger footage
+        const canvas = el.canvases[camIndex];
+        let postChunks = [];
+        let postRec = null;
+
+        try {
+            const stream = canvas.captureStream(15);
+            postRec = new MediaRecorder(stream, { mimeType: MIME, videoBitsPerSecond: 800_000 });
+            postRec.ondataavailable = e => { if (e.data && e.data.size > 0) postChunks.push(e.data); };
+            postRec.start(250);
+        } catch(e) {
+            console.warn("Post-trigger recorder failed:", e);
+            state.recordingEvents.delete(eventId);
+            renderTable(state.logs);
+            return;
+        }
+
+        // Wait for post-trigger window
+        await new Promise(r => setTimeout(r, POST_RECORD_MS));
+        postRec.stop();
+        await new Promise(r => { postRec.onstop = r; setTimeout(r, 500); });
+
+        // Combine pre + post chunks into one Blob
+        const allChunks = [...priorChunks, ...postChunks];
+        if (!allChunks.length) {
+            state.recordingEvents.delete(eventId);
+            renderTable(state.logs);
+            return;
+        }
+
+        const finalBlob = new Blob(allChunks, { type: MIME });
+
+        // Encode as Base64 for JSON transport
+        const reader = new FileReader();
+        const base64Data = await new Promise((resolve, reject) => {
+            reader.onload  = () => resolve(reader.result.split(",")[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(finalBlob);
+        });
+
+        // Upload to backend
+        try {
+            const r = await fetch(`/api/events/${eventId}/clip`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ clip_b64: base64Data, mime: MIME })
+            });
+            if (!r.ok) console.warn("Clip upload failed:", await r.text());
+        } catch(e) {
+            console.error("Clip upload error:", e);
+        }
+
+        state.recordingEvents.delete(eventId);
+        await loadLogs(); // Refresh table with play button now visible
+    }
+
+    /* -------------------------------------------------------
+       BROWSER PUSH NOTIFICATIONS
+     ------------------------------------------------------- */
+
+    async function initPushNotifications() {
+        const toggle = document.getElementById("switch-push-alerts");
+        if (!toggle) return;
+
+        // Restore saved preference
+        const saved = localStorage.getItem("push_enabled");
+        if (saved === "true") {
+            // Re-request in case permission was already granted
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") {
+                state.pushEnabled = true;
+                toggle.checked = true;
+            } else {
+                localStorage.setItem("push_enabled", "false");
+            }
+        }
+
+        toggle.addEventListener("change", async e => {
+            if (e.target.checked) {
+                if (!('Notification' in window)) {
+                    alert("This browser does not support desktop notifications.");
+                    toggle.checked = false;
+                    return;
+                }
+                const permission = await Notification.requestPermission();
+                if (permission === "granted") {
+                    state.pushEnabled = true;
+                    localStorage.setItem("push_enabled", "true");
+                    // Confirm with a test notification
+                    new Notification("CamSpy Alerts Active", {
+                        body: "You will be notified on high-confidence detections.",
+                        icon: "/static/img/logo.png",
+                        tag: "camspy-init"
+                    });
+                } else {
+                    state.pushEnabled = false;
+                    toggle.checked = false;
+                    localStorage.setItem("push_enabled", "false");
+                    alert("Notification permission denied. Please enable in browser settings.");
+                }
+            } else {
+                state.pushEnabled = false;
+                localStorage.setItem("push_enabled", "false");
+            }
+        });
+    }
+
+    function sendPushNotification(label, confidence) {
+        if (!('Notification' in window) || Notification.permission !== "granted") return;
+        const pct   = Math.round(confidence * 100);
+        const clean = label.replace(/^\[CAM \d+\] /, "").replace(/_/g, " ").toUpperCase();
+        new Notification(`⚠ CamSpy Alert: ${clean} Detected`, {
+            body: `Confidence: ${pct}%  —  ${new Date().toLocaleTimeString()}`,
+            icon: "/static/img/logo.png",
+            tag: "camspy-alert",
+            renotify: true,
+            requireInteraction: false
+        });
+    }
+
+    /* -------------------------------------------------------
+       CLIP MODAL — VIDEO REVIEW
+     ------------------------------------------------------- */
+
+    function openClipModal(log) {
+        const modal      = document.getElementById("clip-modal");
+        const video      = document.getElementById("modal-video");
+        const info       = document.getElementById("modal-clip-info");
+        const downloadEl = document.getElementById("modal-download");
+        const loadingEl  = document.getElementById("modal-video-loading");
+
+        if (!modal || !video) return;
+
+        // Show loading state
+        if (loadingEl) loadingEl.classList.remove("hide");
+        if (video) video.src = "";
+
+        // Populate meta info
+        const pct  = Math.round(log.confidence * 100);
+        const ts   = new Date(log.timestamp).toLocaleString();
+        if (info) info.textContent = `INCIDENT #${String(log.id).padStart(4, "0")} // ${log.label.toUpperCase()} ${pct}% // ${ts}`;
+
+        // Set video source
+        if (log.clip_url) {
+            video.src = log.clip_url;
+            if (downloadEl) {
+                downloadEl.href     = log.clip_url;
+                downloadEl.download = `incident_${String(log.id).padStart(4, "0")}.webm`;
+            }
+            video.onloadeddata = () => { if (loadingEl) loadingEl.classList.add("hide"); };
+            video.onerror      = () => { if (loadingEl) loadingEl.classList.add("hide"); };
+            video.load();
+            video.play().catch(() => {}); // autoplay may be blocked; user can press play
+        }
+
+        // Show modal
+        modal.classList.remove("hide");
+        document.body.style.overflow = "hidden";
+
+        // Close handlers
+        const closeBtn = document.getElementById("modal-close");
+        const closeModal = () => {
+            modal.classList.add("hide");
+            document.body.style.overflow = "";
+            video.pause();
+            video.src = "";
+        };
+
+        if (closeBtn) {
+            // Replace listener to avoid stacking
+            const newClose = closeBtn.cloneNode(true);
+            closeBtn.parentNode.replaceChild(newClose, closeBtn);
+            newClose.addEventListener("click", closeModal);
+        }
+
+        // Click-outside to close
+        const outsideHandler = e => {
+            if (e.target === modal) {
+                closeModal();
+                modal.removeEventListener("click", outsideHandler);
+            }
+        };
+        modal.addEventListener("click", outsideHandler);
+
+        // ESC key to close
+        const escHandler = e => {
+            if (e.key === "Escape") {
+                closeModal();
+                document.removeEventListener("keydown", escHandler);
+            }
+        };
+        document.addEventListener("keydown", escHandler);
+    }
+
+    /* -------------------------------------------------------
+       SETTINGS PERSISTENCE (localStorage)
+     ------------------------------------------------------- */
+
+    function initSettingsPersistence() {
+        const webhookInput = document.getElementById("input-webhook-url");
+
+        // Restore saved webhook URL
+        if (webhookInput) {
+            const savedUrl = localStorage.getItem("webhook_url") || "";
+            webhookInput.value = savedUrl;
+            state.webhookUrl   = savedUrl;
+
+            webhookInput.addEventListener("input", () => {
+                state.webhookUrl = webhookInput.value.trim();
+                localStorage.setItem("webhook_url", state.webhookUrl);
+            });
+            // Also save on blur to catch paste events that don't fire input
+            webhookInput.addEventListener("change", () => {
+                state.webhookUrl = webhookInput.value.trim();
+                localStorage.setItem("webhook_url", state.webhookUrl);
+            });
+        }
     }
 
     /* -------------------------------------------------------
@@ -1479,6 +1821,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // Wire drawing handlers and layout/toolbar buttons
         initDrawingHandlers();
         initLayoutAndToolbarBindings();
+
+        // Initialize persistent settings (webhook URL, push toggle)
+        initSettingsPersistence();
+        await initPushNotifications();
 
         // Wire up time-window tab buttons
         document.querySelectorAll(".chart-tab").forEach(btn => {

@@ -13,6 +13,7 @@ class DetectionEvent(Base):
     confidence = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     bbox = Column(String, nullable=True)  # JSON-encoded list: "[x, y, width, height]"
+    clip_url = Column(String, nullable=True)  # File path to the incident video clip
 
     def to_dict(self):
         """
@@ -23,5 +24,6 @@ class DetectionEvent(Base):
             "label": self.label,
             "confidence": round(self.confidence, 4),
             "timestamp": self.timestamp.isoformat() + "Z" if self.timestamp else None,
-            "bbox": self.bbox
+            "bbox": self.bbox,
+            "clip_url": self.clip_url
         }
