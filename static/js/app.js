@@ -1106,6 +1106,19 @@ document.addEventListener("DOMContentLoaded", () => {
     /* -------------------------------------------------------
        CAMERA STREAM MANAGEMENT
      ------------------------------------------------------- */
+    function isPhoneOrVirtualDevice(label) {
+        if (!label) return true; // Treat empty label as phone/virtual to prevent prompts
+        const lbl = label.toLowerCase();
+        // Check for common phone, virtual, connection link, or wireless/remote keywords
+        const keywords = [
+            "phone", "android", "galaxy", "iphone", "pixel", "huawei", "oneplus", "xiaomi", "redmi", "oppo", "vivo",
+            "continuity", "virtual", "link to windows", "phone link", "epoccam", "droidcam", "ivcam", "iriun", 
+            "obs", "unity", "manycam", "splitcam", "xsplit", "youcam", "cyberlink", "mobile", "connected", "wireless",
+            "remote", "bluetooth", "wifi", "wi-fi", "disconnected"
+        ];
+        return keywords.some(k => lbl.includes(k));
+    }
+
     async function populateCamList() {
         try {
             const devs = await navigator.mediaDevices.enumerateDevices();
@@ -1127,18 +1140,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function pickBestCamera() {
-        const VIRTUAL = ["link to windows","phone link","virtual","droidcam","epoccam","ivcam","disconnected"];
         try {
             const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
             tmp.getTracks().forEach(t => t.stop());
         } catch(_) {}
         const devs = await navigator.mediaDevices.enumerateDevices();
         const cams = devs.filter(d => d.kind === "videoinput");
-        let best = cams[0];
+        let best = null;
         for (const c of cams) {
-            const lbl = (c.label || "").toLowerCase();
-            if (lbl && !VIRTUAL.some(v => lbl.includes(v))) { best = c; break; }
+            if (c.label && !isPhoneOrVirtualDevice(c.label)) {
+                best = c;
+                break;
+            }
         }
+        if (!best) best = cams[0];
         if (best) state.deviceId = best.deviceId;
         await populateCamList();
     }
@@ -1203,10 +1218,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (d.kind !== "videoinput") return false;
                         if (d.deviceId === "" || d.deviceId === state.deviceId) return false;
                         
-                        const label = (d.label || "").toLowerCase();
                         // Exclude phone, virtual, and linkage devices to prevent OS prompt popup
-                        const isPhoneOrVirtual = /phone|android|a35|a55|galaxy|iphone|pixel|continuity|virtual|link to windows|epoccam/i.test(label);
-                        return !isPhoneOrVirtual;
+                        return !isPhoneOrVirtualDevice(d.label);
                     });
 
                     for (let i = 1; i < 4; i++) {
@@ -1545,6 +1558,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const trackedHits = state.trackers[camIndex].update(hits);
         drawBoxes(trackedHits, camIndex);
         renderOverlayBoundaries(camIndex);
+        drawTimestampOverlay(camIndex);
     }
 
     /* -------------------------------------------------------
@@ -1724,6 +1738,68 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.fillText(`TRIPWIRE 0${tIdx+1}`, Math.min(tx1, tx2) + 5, Math.min(ty1, ty2) - 5);
             ctx.restore();
         });
+    }
+
+    function drawTimestampOverlay(camIndex) {
+        const canvas = el.canvases[camIndex];
+        const ctx = ctxs[camIndex];
+        
+        ctx.save();
+        ctx.font = "11px 'Share Tech Mono', monospace";
+        
+        // Format live UTC time: YYYY-MM-DD HH:MM:SS UTC
+        const now = new Date();
+        const yyyy = now.getUTCFullYear();
+        const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(now.getUTCDate()).padStart(2, '0');
+        const hh = String(now.getUTCHours()).padStart(2, '0');
+        const min = String(now.getUTCMinutes()).padStart(2, '0');
+        const ss = String(now.getUTCSeconds()).padStart(2, '0');
+        
+        const timestampStr = `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} UTC`;
+        const camIdStr = `CAM 0${camIndex + 1}`;
+        const overlayText = `${camIdStr} | ${timestampStr}`;
+        
+        const textWidth = ctx.measureText(overlayText).width;
+        const textHeight = 12;
+        
+        const margin = 10;
+        const x = canvas.width - textWidth - margin - 8;
+        const y = margin;
+        
+        // Draw translucent dark background pill
+        ctx.fillStyle = "rgba(7, 9, 14, 0.65)";
+        ctx.strokeStyle = "rgba(0, 255, 213, 0.25)";
+        ctx.lineWidth = 1;
+        
+        const px = x;
+        const py = y;
+        const pw = textWidth + 16;
+        const ph = textHeight + 8;
+        const r = 4;
+        
+        ctx.beginPath();
+        ctx.moveTo(px + r, py);
+        ctx.lineTo(px + pw - r, py);
+        ctx.quadraticCurveTo(px + pw, py, px + pw, py + r);
+        ctx.lineTo(px + pw, py + ph - r);
+        ctx.quadraticCurveTo(px + pw, py + ph, px + pw - r, py + ph);
+        ctx.lineTo(px + r, py + ph);
+        ctx.quadraticCurveTo(px, py + ph, px, py + ph - r);
+        ctx.lineTo(px, py + r);
+        ctx.quadraticCurveTo(px, py, px + r, py);
+        ctx.closePath();
+        
+        ctx.fill();
+        ctx.stroke();
+        
+        // Draw text with shadow glow
+        ctx.fillStyle = "#00ffd5"; // Cyan text matching the dashboard
+        ctx.shadowColor = "#00ffd5";
+        ctx.shadowBlur = 4;
+        ctx.fillText(overlayText, x + 8, y + textHeight + 2);
+        
+        ctx.restore();
     }
 
     /* -------------------------------------------------------
