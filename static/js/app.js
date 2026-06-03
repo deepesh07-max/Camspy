@@ -1198,7 +1198,15 @@ document.addEventListener("DOMContentLoaded", () => {
             // Query other physical cameras
             try {
                 const devs = await navigator.mediaDevices.enumerateDevices();
-                const cams = devs.filter(d => d.kind === "videoinput" && d.deviceId !== state.deviceId && d.deviceId !== "");
+                const cams = devs.filter(d => {
+                    if (d.kind !== "videoinput") return false;
+                    if (d.deviceId === "" || d.deviceId === state.deviceId) return false;
+                    
+                    const label = (d.label || "").toLowerCase();
+                    // Exclude phone, virtual, and linkage devices to prevent OS prompt popup
+                    const isPhoneOrVirtual = /phone|android|a35|a55|galaxy|iphone|pixel|continuity|virtual|link to windows|epoccam/i.test(label);
+                    return !isPhoneOrVirtual;
+                });
 
                 for (let i = 1; i < 4; i++) {
                     if (cams[i - 1]) {
