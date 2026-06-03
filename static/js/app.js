@@ -138,6 +138,109 @@ document.addEventListener("DOMContentLoaded", () => {
     const ALL_UNIQUE_KEYS = [...new Set(TARGET_KEYS)];
 
     /* -------------------------------------------------------
+       TRACKER — IoU-based persistent object ID assignment
+     ------------------------------------------------------- */
+    class Tracker {
+        /**
+         * @param {number} iouThreshold  Minimum IoU to consider a match (default 0.25)
+         * @param {number} maxLost       Frames before a track is pruned (default 45 ≈ 3 s)
+         */
+        constructor(iouThreshold = 0.25, maxLost = 45) {
+            this.iouThreshold = iouThreshold;
+            this.maxLost      = maxLost;
+            this.tracks       = [];  // { id, label, bbox, lostFrames, age }
+            this.nextId       = 1;
+        }
+
+        /** Compute Intersection over Union for two [x,y,w,h] bboxes */
+        iou(a, b) {
+            const ax1 = a[0], ay1 = a[1], ax2 = a[0] + a[2], ay2 = a[1] + a[3];
+            const bx1 = b[0], by1 = b[1], bx2 = b[0] + b[2], by2 = b[1] + b[3];
+            const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1));
+            const iy = Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
+            const inter = ix * iy;
+            if (inter === 0) return 0;
+            const areaA = a[2] * a[3];
+            const areaB = b[2] * b[3];
+            return inter / (areaA + areaB - inter);
+        }
+
+        /**
+         * Run one tracking frame.
+         * @param {Array} detections  Array of hit objects with .bbox and .class
+         * @returns {Array}           Same detections enriched with .trackId and .trackAge
+         */
+        update(detections) {
+            // --- Build IoU matrix: pairs[i] = { iou, detIdx, trkIdx } ---
+            const pairs = [];
+            for (let di = 0; di < detections.length; di++) {
+                for (let ti = 0; ti < this.tracks.length; ti++) {
+                    const trk = this.tracks[ti];
+                    // Only match same-label tracks
+                    if (trk.label !== detections[di].class) continue;
+                    const score = this.iou(detections[di].bbox, trk.bbox);
+                    if (score >= this.iouThreshold) {
+                        pairs.push({ score, di, ti });
+                    }
+                }
+            }
+
+            // --- Greedy assignment: best IoU pairs first ---
+            pairs.sort((a, b) => b.score - a.score);
+            const usedDet = new Set();
+            const usedTrk = new Set();
+            const matched = new Map(); // di → ti
+
+            for (const { di, ti } of pairs) {
+                if (usedDet.has(di) || usedTrk.has(ti)) continue;
+                matched.set(di, ti);
+                usedDet.add(di);
+                usedTrk.add(ti);
+            }
+
+            // --- Update matched tracks ---
+            matched.forEach((ti, di) => {
+                const trk = this.tracks[ti];
+                trk.bbox       = detections[di].bbox;
+                trk.lostFrames = 0;
+                trk.age++;
+                detections[di].trackId  = trk.id;
+                detections[di].trackAge = trk.age;
+            });
+
+            // --- Create new tracks for unmatched detections ---
+            for (let di = 0; di < detections.length; di++) {
+                if (!usedDet.has(di)) {
+                    const newTrack = {
+                        id:         this.nextId++,
+                        label:      detections[di].class,
+                        bbox:       detections[di].bbox,
+                        lostFrames: 0,
+                        age:        1
+                    };
+                    this.tracks.push(newTrack);
+                    detections[di].trackId  = newTrack.id;
+                    detections[di].trackAge = 1;
+                }
+            }
+
+            // --- Age unmatched tracks; remove dead ones ---
+            this.tracks = this.tracks.filter((trk, ti) => {
+                if (!usedTrk.has(ti)) trk.lostFrames++;
+                return trk.lostFrames < this.maxLost;
+            });
+
+            return detections;
+        }
+
+        /** Reset all state — call when camera is stopped */
+        reset() {
+            this.tracks = [];
+            this.nextId = 1;
+        }
+    }
+
+    /* -------------------------------------------------------
        STATE
      ------------------------------------------------------- */
     const state = {
@@ -187,6 +290,9 @@ document.addEventListener("DOMContentLoaded", () => {
         preBuffers:         [[], [], [], []],           // Rolling 2-second chunk arrays
         pushEnabled:        false,
         webhookUrl:         "",
+
+        // Per-camera IoU trackers — independent ID sequences
+        trackers: [ new Tracker(), new Tracker(), new Tracker(), new Tracker() ],
     };
 
     const ctxs = el.canvases.map(c => c.getContext("2d"));
@@ -835,6 +941,9 @@ document.addEventListener("DOMContentLoaded", () => {
             state.preBuffers[idx] = [];
         });
 
+        // Reset trackers so IDs restart from #1 on next camera activation
+        state.trackers.forEach(t => t.reset());
+
         el.webcams.forEach(w => {
             w.srcObject = null;
         });
@@ -1046,7 +1155,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        drawBoxes(hits, camIndex);
+        // Run IoU tracker — enriches each hit with .trackId and .trackAge
+        const trackedHits = state.trackers[camIndex].update(hits);
+        drawBoxes(trackedHits, camIndex);
         renderOverlayBoundaries(camIndex);
     }
 
@@ -1125,13 +1236,14 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.stroke();
             ctx.globalAlpha = 1;
 
-            // Floating Label Banner
-            const textString = `${label.replace(/_/g," ").toUpperCase()} ${score}%`;
+            // Floating Label Banner  — format: "#1 · PERSON 94%"
+            const idTag     = p.trackId != null ? `#${p.trackId} \u00b7 ` : "";
+            const textString = `${idTag}${label.replace(/_/g," ").toUpperCase()} ${score}%`;
             ctx.font = `600 9px 'Inter', sans-serif`;
             const textWidth = ctx.measureText(textString).width;
 
             ctx.save();
-            ctx.fillStyle   = P.c;
+            ctx.fillStyle = P.c;
             if (p.triggered) {
                 ctx.shadowColor = P.c;
                 ctx.shadowBlur  = 6;
@@ -1141,6 +1253,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
             ctx.fillStyle = "#07090e";
             ctx.fillText(textString, x + 7, y - 6);
+
+            // Track age mini-badge — bottom-right corner of bounding box
+            if (p.triggered && p.trackAge != null) {
+                const ageSec  = Math.round(p.trackAge / 15); // approx at 15fps
+                const ageText = `T+${ageSec}s`;
+                ctx.save();
+                ctx.font      = `500 7px 'Share Tech Mono', monospace`;
+                ctx.fillStyle = P.c;
+                ctx.globalAlpha = 0.55;
+                ctx.fillText(ageText, x + w - ctx.measureText(ageText).width - 4, y + h - 4);
+                ctx.restore();
+            }
 
             // Vector center sweep lines (Only on active alerts)
             if (p.triggered) {
