@@ -305,6 +305,22 @@ document.addEventListener("DOMContentLoaded", () => {
         sessionActive:      false,
         sessionStartTime:   null,
         sessionDetections:  [],
+
+        // Overview heatmap — accumulates centroid hits [{ x, y }] for the overview canvas
+        overviewHeatHits:   [],
+
+        // Quiet hours state
+        quietHoursEnabled:  false,
+        quietStart:         "09:00",
+        quietEnd:           "18:00",
+
+        // Severity counts (reset on sensor start)
+        sevHigh:            0,
+        sevMed:             0,
+        sevLow:             0,
+
+        // Uptime ticker
+        uptimeInterval:     null,
     };
 
     const ctxs = el.canvases.map(c => c.getContext("2d"));
@@ -485,6 +501,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function beep() {
         if (!state.audioCtx || !state.alarmOn || state.ringing) return;
+
+        // Quiet hours suppression check
+        if (state.quietHoursEnabled) {
+            const now = new Date();
+            const hhmm = now.getHours() * 60 + now.getMinutes();
+            const [sqH, sqM] = state.quietStart.split(":").map(Number);
+            const [eqH, eqM] = state.quietEnd.split(":").map(Number);
+            const startMin = sqH * 60 + sqM;
+            const endMin   = eqH * 60 + eqM;
+            const inWindow = startMin <= endMin
+                ? (hhmm >= startMin && hhmm < endMin)
+                : (hhmm >= startMin || hhmm < endMin);
+            if (inWindow) return; // Silenced during quiet hours
+        }
+
         state.ringing = true;
         try {
             const osc  = state.audioCtx.createOscillator();
@@ -975,11 +1006,47 @@ document.addEventListener("DOMContentLoaded", () => {
             renderTable(state.logs);
             refreshChart(state.logs);
             updateOverviewTransactions(state.logs);
-            const savingsEl = document.getElementById("overview-savings-val");
-            if (savingsEl) {
-                savingsEl.textContent = `$${(2512.40 + state.logs.length * 1.25).toFixed(2)}`;
-            }
+            updateOverviewDetectionMetrics(state.logs);
         } catch(e) { console.error("loadLogs:", e); }
+    }
+
+    /* -------------------------------------------------------
+       OVERVIEW: DETECTION METRICS — severity counts & trend
+     ------------------------------------------------------- */
+    function updateOverviewDetectionMetrics(logs) {
+        // Total count
+        const total = logs.length;
+        const totalEl = document.getElementById("overview-detections-val");
+        if (totalEl) totalEl.textContent = total;
+
+        // Trend % — compare last 50 vs prior 50
+        const trendEl = document.getElementById("overview-trend-val");
+        if (trendEl) {
+            const recent = logs.slice(0, 50).length;
+            const prior  = logs.slice(50, 100).length;
+            if (prior > 0) {
+                const pct = Math.round(((recent - prior) / prior) * 100);
+                trendEl.textContent = (pct >= 0 ? "+" : "") + pct + "%";
+                trendEl.className   = "cm-trend " + (pct >= 0 ? "positive" : "negative");
+            } else {
+                trendEl.textContent = "+0%";
+            }
+        }
+
+        // Severity breakdown: HIGH ≥80%, MED 60–79%, LOW <60%
+        let high = 0, med = 0, low = 0;
+        logs.forEach(l => {
+            const pct = l.confidence * 100;
+            if (pct >= 80)       high++;
+            else if (pct >= 60)  med++;
+            else                 low++;
+        });
+        const sevHighEl = document.getElementById("sev-high-val");
+        const sevMedEl  = document.getElementById("sev-med-val");
+        const sevLowEl  = document.getElementById("sev-low-val");
+        if (sevHighEl) sevHighEl.textContent = high;
+        if (sevMedEl)  sevMedEl.textContent  = med;
+        if (sevLowEl)  sevLowEl.textContent  = low;
     }
 
     async function postEvent(label, confidence, bbox, camIndex = null) {
@@ -1169,7 +1236,12 @@ document.addEventListener("DOMContentLoaded", () => {
         state.sessionActive = true;
         state.sessionStartTime = new Date();
         state.sessionDetections = [];
-        
+        state.overviewHeatHits  = []; // reset overview heatmap hits
+        state.sevHigh = 0; state.sevMed = 0; state.sevLow = 0;
+
+        // Start session uptime clock
+        startUptimeClock();
+
         // Clear heatmap canvases
         state.heatmaps.forEach(canvas => {
             if (canvas) {
@@ -1300,6 +1372,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function stopCamera() {
+        // Stop session uptime clock
+        stopUptimeClock();
+
         // End session and generate PDF report if detections occurred
         if (state.sessionActive) {
             state.sessionActive = false;
@@ -1511,7 +1586,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // Record heatmap hits and session detections
+        // Record heatmap hits, session detections, and overview heatmap centroids
         if (state.active) {
             hits.forEach(h => {
                 recordHeatmapHit(camIndex, h.bbox, canvas);
@@ -1522,6 +1597,29 @@ document.addEventListener("DOMContentLoaded", () => {
                         score: h.score,
                         camIndex: camIndex
                     });
+
+                    // Store normalised centroid for overview heatmap
+                    const [bx, by, bw, bh] = h.bbox;
+                    state.overviewHeatHits.push({
+                        nx: (bx + bw / 2) / canvas.width,
+                        ny: (by + bh / 2) / canvas.height
+                    });
+                    // Cap at 2000 points to avoid memory growth
+                    if (state.overviewHeatHits.length > 2000) state.overviewHeatHits.shift();
+
+                    // Real-time severity counters
+                    const pct = h.score * 100;
+                    if (pct >= 80)      state.sevHigh++;
+                    else if (pct >= 60) state.sevMed++;
+                    else                state.sevLow++;
+
+                    // Live-update severity UI
+                    const sevHighEl = document.getElementById("sev-high-val");
+                    const sevMedEl  = document.getElementById("sev-med-val");
+                    const sevLowEl  = document.getElementById("sev-low-val");
+                    if (sevHighEl) sevHighEl.textContent = state.sevHigh;
+                    if (sevMedEl)  sevMedEl.textContent  = state.sevMed;
+                    if (sevLowEl)  sevLowEl.textContent  = state.sevLow;
                 }
             });
         }
@@ -2424,11 +2522,143 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
-       MULTI-VIEW NAV TOGGLER & CASHMATE DASHBOARD
+       SESSION UPTIME CLOCK
      ------------------------------------------------------- */
-    let cmSavingsChartObj = null;
-    let cmInvestmentsChartObj = null;
-    let cmMainBarChartObj = null;
+    function startUptimeClock() {
+        if (state.uptimeInterval) clearInterval(state.uptimeInterval);
+        const uptimeEl       = document.getElementById("overview-uptime-val");
+        const uptimeStatusEl = document.getElementById("overview-uptime-status");
+        const uptimeBadgeEl  = document.getElementById("uptime-trend-badge");
+
+        if (uptimeBadgeEl) {
+            uptimeBadgeEl.textContent = "LIVE";
+            uptimeBadgeEl.style.background = "rgba(16, 185, 129, 0.15)";
+            uptimeBadgeEl.style.color      = "var(--green)";
+        }
+        if (uptimeStatusEl) uptimeStatusEl.textContent = "STATUS: SENSOR ACTIVE";
+
+        state.uptimeInterval = setInterval(() => {
+            if (!state.sessionStartTime) return;
+            const elapsed = Math.floor((Date.now() - state.sessionStartTime.getTime()) / 1000);
+            const hh = String(Math.floor(elapsed / 3600)).padStart(2, "0");
+            const mm = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
+            const ss = String(elapsed % 60).padStart(2, "0");
+            if (uptimeEl) uptimeEl.textContent = `${hh}:${mm}:${ss}`;
+        }, 1000);
+    }
+
+    function stopUptimeClock() {
+        if (state.uptimeInterval) {
+            clearInterval(state.uptimeInterval);
+            state.uptimeInterval = null;
+        }
+        const uptimeBadgeEl  = document.getElementById("uptime-trend-badge");
+        const uptimeStatusEl = document.getElementById("overview-uptime-status");
+        if (uptimeBadgeEl) {
+            uptimeBadgeEl.textContent = "STBY";
+            uptimeBadgeEl.style.background = "rgba(100, 116, 139, 0.15)";
+            uptimeBadgeEl.style.color      = "#64748b";
+        }
+        if (uptimeStatusEl) uptimeStatusEl.textContent = "STATUS: SENSOR STANDBY";
+    }
+
+    /* -------------------------------------------------------
+       OVERVIEW HEATMAP CANVAS RENDERER
+     ------------------------------------------------------- */
+    function drawOverviewHeatmap() {
+        const canvas = document.getElementById("overview-heatmap-canvas");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+
+        // Sync canvas resolution to its displayed size
+        const { offsetWidth: W, offsetHeight: H } = canvas;
+        if (canvas.width !== W || canvas.height !== H) {
+            canvas.width  = W || 640;
+            canvas.height = H || 380;
+        }
+        const cw = canvas.width;
+        const ch = canvas.height;
+
+        // Dark background
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.fillStyle = "rgba(2, 3, 5, 0.92)";
+        ctx.fillRect(0, 0, cw, ch);
+
+        // Draw grid lines
+        ctx.strokeStyle = "rgba(255,255,255,0.03)";
+        ctx.lineWidth   = 1;
+        for (let x = 0; x < cw; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke(); }
+        for (let y = 0; y < ch; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke(); }
+
+        if (state.overviewHeatHits.length === 0) {
+            // Empty state label
+            ctx.fillStyle = "#475569";
+            ctx.font      = "12px 'Share Tech Mono', monospace";
+            ctx.textAlign = "center";
+            ctx.fillText("NO DETECTION DATA — START SENSOR TO POPULATE", cw / 2, ch / 2);
+            ctx.textAlign = "left";
+            return;
+        }
+
+        // Build density map: bucket hits into a 32×18 grid
+        const COLS = 32, ROWS = 18;
+        const density = new Array(COLS * ROWS).fill(0);
+        state.overviewHeatHits.forEach(({ nx, ny }) => {
+            const gx = Math.min(COLS - 1, Math.floor(nx * COLS));
+            const gy = Math.min(ROWS - 1, Math.floor(ny * ROWS));
+            density[gy * COLS + gx]++;
+        });
+        const maxD = Math.max(...density, 1);
+
+        const cellW = cw / COLS;
+        const cellH = ch / ROWS;
+
+        density.forEach((count, idx) => {
+            if (count === 0) return;
+            const col = idx % COLS;
+            const row = Math.floor(idx / COLS);
+            const intensity = count / maxD;
+
+            // Color: low = cyan tint, mid = amber, high = red
+            let r, g, b;
+            if (intensity < 0.5) {
+                const t = intensity * 2;
+                r = Math.round(0   + t * 245); g = Math.round(255 - t * 97); b = Math.round(213 - t * 202);
+            } else {
+                const t = (intensity - 0.5) * 2;
+                r = Math.round(245 + t * 0); g = Math.round(158 - t * 95); b = Math.round(11 + t * 47);
+            }
+
+            const radius = Math.max(cellW, cellH) * 1.2;
+            const cx = col * cellW + cellW / 2;
+            const cy = row * cellH + cellH / 2;
+
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+            grad.addColorStop(0,   `rgba(${r},${g},${b},${0.55 * intensity + 0.15})`);
+            grad.addColorStop(1,   "rgba(0,0,0,0)");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Overlay legend
+        const gradLegend = ctx.createLinearGradient(cw - 100, 0, cw - 10, 0);
+        gradLegend.addColorStop(0,   "rgba(0,255,213,0.7)");
+        gradLegend.addColorStop(0.5, "rgba(245,158,11,0.7)");
+        gradLegend.addColorStop(1,   "rgba(244,63,94,0.7)");
+        ctx.fillStyle = gradLegend;
+        ctx.fillRect(cw - 100, ch - 22, 90, 8);
+        ctx.fillStyle = "#64748b";
+        ctx.font = "9px 'Share Tech Mono', monospace";
+        ctx.fillText("LOW", cw - 100, ch - 8);
+        ctx.fillText("HIGH", cw - 28, ch - 8);
+        ctx.fillText(`${state.overviewHeatHits.length} hits`, 10, ch - 8);
+    }
+
+    /* -------------------------------------------------------
+       MULTI-VIEW NAV TOGGLER & OVERVIEW DASHBOARD
+     ------------------------------------------------------- */
 
     function initTabNavigation() {
         const pills = document.querySelectorAll("#nav-view-pills .nav-pill");
@@ -2462,122 +2692,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function initOverviewCharts() {
-        const savingsCtx = document.getElementById("cm-savings-chart")?.getContext("2d");
-        const invCtx = document.getElementById("cm-investments-chart")?.getContext("2d");
-        const mainBarCtx = document.getElementById("cm-main-bar-chart")?.getContext("2d");
-
-        // 1. Savings Chart (Red Line)
-        if (savingsCtx && !cmSavingsChartObj) {
-            cmSavingsChartObj = new Chart(savingsCtx, {
-                type: "line",
-                data: {
-                    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
-                    datasets: [{
-                        data: [2200, 2400, 2300, 2512, 2450, 2480, 2512],
-                        borderColor: "#f43f5e",
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        tension: 0.4,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { x: { display: false }, y: { display: false } }
-                }
-            });
-        }
-
-        // 2. Investments Chart (Green Area)
-        if (invCtx && !cmInvestmentsChartObj) {
-            const greenGrad = invCtx.createLinearGradient(0, 0, 0, 45);
-            greenGrad.addColorStop(0, "rgba(16, 185, 129, 0.25)");
-            greenGrad.addColorStop(1, "rgba(16, 185, 129, 0.0)");
-
-            cmInvestmentsChartObj = new Chart(invCtx, {
-                type: "line",
-                data: {
-                    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
-                    datasets: [{
-                        data: [800, 950, 900, 1100, 1050, 1180, 1215],
-                        borderColor: "#10b981",
-                        borderWidth: 2,
-                        backgroundColor: greenGrad,
-                        fill: true,
-                        pointRadius: 0,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { x: { display: false }, y: { display: false } }
-                }
-            });
-        }
-
-        // 3. Large Spent Bar Chart (Vibrant colors matching Cashmate)
-        if (mainBarCtx && !cmMainBarChartObj) {
-            cmMainBarChartObj = new Chart(mainBarCtx, {
-                type: "bar",
-                data: {
-                    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
-                    datasets: [
-                        {
-                            label: "Expenses",
-                            data: [150, 180, 140, 280, 240, 310, 190],
-                            backgroundColor: "#10b981",
-                            borderRadius: 4,
-                            barThickness: 12
-                        },
-                        {
-                            label: "Transfers",
-                            data: [200, 220, 210, 180, 300, 240, 350],
-                            backgroundColor: "#3b82f6",
-                            borderRadius: 4,
-                            barThickness: 12
-                        },
-                        {
-                            label: "Subscriptions",
-                            data: [120, 130, 110, 150, 140, 180, 160],
-                            backgroundColor: "#c084fc",
-                            borderRadius: 4,
-                            barThickness: 12
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: "bottom",
-                            labels: { color: "#64748b", font: { family: "Inter", size: 10 } }
-                        },
-                        tooltip: {
-                            backgroundColor: "#0e111a",
-                            borderColor: "rgba(255,255,255,0.05)",
-                            borderWidth: 1,
-                            titleColor: "#fff",
-                            bodyColor: "#cbd5e1"
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: "#64748b", font: { family: "Inter", size: 10 } }
-                        },
-                        y: {
-                            grid: { color: "rgba(255,255,255,0.02)" },
-                            ticks: { color: "#64748b", font: { family: "Inter", size: 10 } }
-                        }
-                    }
-                }
-            });
-        }
+        // Draw the detection cluster heatmap on the overview canvas
+        drawOverviewHeatmap();
     }
 
     function updateOverviewTransactions(logs) {
@@ -2635,6 +2751,102 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* -------------------------------------------------------
+       QUIET HOURS CONTROLS WIRING
+     ------------------------------------------------------- */
+    function initQuietHoursControls() {
+        const toggle    = document.getElementById("switch-quiet-hours");
+        const startInp  = document.getElementById("input-quiet-start");
+        const endInp    = document.getElementById("input-quiet-end");
+        const statusEl  = document.getElementById("quiet-hours-status");
+
+        function updateQuietStatus() {
+            if (!statusEl) return;
+            if (!state.quietHoursEnabled) {
+                statusEl.textContent = "SUPPRESSION SCHEDULE OFF";
+                statusEl.style.color = "#64748b";
+                return;
+            }
+            statusEl.textContent = `SUPPRESSION: ${state.quietStart} – ${state.quietEnd}`;
+            statusEl.style.color = "var(--green)";
+        }
+
+        if (toggle) {
+            toggle.addEventListener("change", e => {
+                state.quietHoursEnabled = e.target.checked;
+                updateQuietStatus();
+            });
+        }
+        if (startInp) {
+            startInp.addEventListener("change", e => {
+                state.quietStart = e.target.value;
+                updateQuietStatus();
+            });
+        }
+        if (endInp) {
+            endInp.addEventListener("change", e => {
+                state.quietEnd = e.target.value;
+                updateQuietStatus();
+            });
+        }
+        updateQuietStatus();
+    }
+
+    /* -------------------------------------------------------
+       FILTER MODAL WIRING
+     ------------------------------------------------------- */
+    function initFilterModal() {
+        const openBtn   = document.getElementById("btn-configure-filters");
+        const modal     = document.getElementById("filter-modal");
+        const closeBtn  = document.getElementById("filter-modal-close");
+        const countLbl  = document.getElementById("filter-count-label");
+
+        function updateCountLabel() {
+            if (countLbl) countLbl.textContent = state.targets.size;
+        }
+        updateCountLabel();
+
+        // Re-run count label whenever filters change (piggyback updateAlarmTargetDiag)
+        const _origUpdate = updateAlarmTargetDiag;
+        // Patch to also refresh count label after every filter change
+        const patchedUpdate = () => { _origUpdate(); updateCountLabel(); };
+        // We re-wire the select-all / none / invert buttons below
+        if (el.btnSelectAll) {
+            el.btnSelectAll.addEventListener("click", updateCountLabel);
+        }
+        if (el.btnSelectNone) {
+            el.btnSelectNone.addEventListener("click", updateCountLabel);
+        }
+        if (el.btnInvert) {
+            el.btnInvert.addEventListener("click", updateCountLabel);
+        }
+
+        function openModal() {
+            if (!modal) return;
+            renderFilters();
+            modal.classList.remove("hide");
+            document.body.style.overflow = "hidden";
+        }
+        function closeModal() {
+            if (!modal) return;
+            modal.classList.add("hide");
+            document.body.style.overflow = "";
+            updateCountLabel();
+            updateAlarmTargetDiag();
+        }
+
+        if (openBtn)  openBtn.addEventListener("click", openModal);
+        if (closeBtn) closeBtn.addEventListener("click", closeModal);
+        if (modal) {
+            modal.addEventListener("click", e => {
+                if (e.target === modal) closeModal();
+            });
+        }
+        document.addEventListener("keydown", e => {
+            if (e.key === "Escape" && modal && !modal.classList.contains("hide")) closeModal();
+        });
+    }
+
+    /* -------------------------------------------------------
        INITIALIZATION
      ------------------------------------------------------- */
     async function init() {
@@ -2653,6 +2865,12 @@ document.addEventListener("DOMContentLoaded", () => {
         initSettingsPersistence();
         await initPushNotifications();
 
+        // Wire quiet hours controls
+        initQuietHoursControls();
+
+        // Wire filter modal
+        initFilterModal();
+
         // Wire up tab views toggling
         initTabNavigation();
 
@@ -2666,11 +2884,14 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Initialize Cashmate dashboard on start
+        // Initialize Overview charts/heatmap on start
         initOverviewCharts();
 
-        // Rolling 2-second tick — makes the chart scroll forward even with no new events
-        setInterval(refreshTimelineChart, 2000);
+        // Rolling 2-second tick — makes the chart scroll forward and redraws overview heatmap
+        setInterval(() => {
+            refreshTimelineChart();
+            drawOverviewHeatmap();
+        }, 2000);
 
         showLoading("INITIALIZING NEURAL NET", "Fetching COCO-SSD weights from node...");
         appendDiagTerminal("LOADING NEURAL NET WEIGHTS (COCO-SSD)...");
