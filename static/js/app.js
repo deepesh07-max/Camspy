@@ -250,7 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ready:          false,
         active:         false,
         deviceId:       null,
-        threshold:      0.65,
+        threshold:      0.50,
         targets:        new Set(ALL_UNIQUE_KEYS), // Default: all active
 
         fps:            0,
@@ -1472,6 +1472,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const t0 = performance.now();
         try {
             if (state.layoutMode === "single") {
+                // Single mode: run full detection on primary camera
                 const webcam = el.webcams[0];
                 if (webcam && webcam.readyState >= 2) {
                     const preds = await state.model.detect(webcam);
@@ -1481,17 +1482,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     processDetections(preds, 0);
                 }
             } else {
-                // Round robin processing for Grid mode to preserve high performance
-                const idx = state.activeCamRoundRobin || 0;
-                const webcam = el.webcams[idx];
-                if (webcam && webcam.readyState >= 2) {
-                    const preds = await state.model.detect(webcam);
-                    state.latency = Math.round(performance.now() - t0);
-                    if (el.latencyDisplay) el.latencyDisplay.textContent = `${state.latency} ms`;
-                    countFPS();
-                    processDetections(preds, idx);
-                }
-                state.activeCamRoundRobin = (idx + 1) % 4;
+                // Grid mode: run all cameras in parallel each frame for true simultaneous multi-cam detection
+                const tasks = el.webcams.map((webcam, idx) => {
+                    if (webcam && webcam.readyState >= 2) {
+                        return state.model.detect(webcam).then(preds => ({ preds, idx }));
+                    }
+                    return Promise.resolve({ preds: [], idx });
+                });
+                const results = await Promise.all(tasks);
+                state.latency = Math.round(performance.now() - t0);
+                if (el.latencyDisplay) el.latencyDisplay.textContent = `${state.latency} ms`;
+                countFPS();
+                results.forEach(({ preds, idx }) => processDetections(preds, idx));
             }
         } catch(e) { console.error("Inference error:", e); }
         requestAnimationFrame(loop);
