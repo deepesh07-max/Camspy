@@ -1360,7 +1360,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 updateActiveChannelsDisplay();
-                requestAnimationFrame(loop);
+                startInferenceLoop();       // kick off throttled inference timer
+                requestAnimationFrame(loop); // kick off smooth render loop
             };
         } catch(err) {
             clearTimeout(_camTimer);
@@ -1407,6 +1408,8 @@ document.addEventListener("DOMContentLoaded", () => {
             w.srcObject = null;
         });
 
+        stopInferenceLoop(); // stop inference timer
+        _lastPreds = [[], [], [], []]; // clear stale predictions
         state.active = false;
         setPowerUI(false);
         
@@ -1467,35 +1470,61 @@ document.addEventListener("DOMContentLoaded", () => {
     /* -------------------------------------------------------
        INFERENCE LOOP
      ------------------------------------------------------- */
-    async function loop() {
-        if (!state.active) return;
-        const t0 = performance.now();
-        try {
-            if (state.layoutMode === "single") {
-                // Single mode: run full detection on primary camera
+    /* Inference runs on its own timer — completely decoupled from rAF so the
+       canvas rendering (draw loop) never blocks waiting for TF.js GPU work.
+       Single mode  : ~15 fps  (every 65 ms)
+       Grid mode    : one camera every 200 ms round-robin (~5 fps / cam)      */
+    let _inferenceTimer  = null;
+    let _gridCamIndex    = 0;
+    let _lastPreds       = [[], [], [], []]; // cached predictions per camera
+
+    function startInferenceLoop() {
+        stopInferenceLoop();
+        if (state.layoutMode === "single") {
+            _inferenceTimer = setInterval(async () => {
+                if (!state.active || !state.model) return;
                 const webcam = el.webcams[0];
-                if (webcam && webcam.readyState >= 2) {
-                    const preds = await state.model.detect(webcam);
+                if (!webcam || webcam.readyState < 2) return;
+                const t0 = performance.now();
+                try {
+                    _lastPreds[0] = await state.model.detect(webcam);
                     state.latency = Math.round(performance.now() - t0);
                     if (el.latencyDisplay) el.latencyDisplay.textContent = `${state.latency} ms`;
-                    countFPS();
-                    processDetections(preds, 0);
-                }
-            } else {
-                // Grid mode: run all cameras in parallel each frame for true simultaneous multi-cam detection
-                const tasks = el.webcams.map((webcam, idx) => {
-                    if (webcam && webcam.readyState >= 2) {
-                        return state.model.detect(webcam).then(preds => ({ preds, idx }));
-                    }
-                    return Promise.resolve({ preds: [], idx });
-                });
-                const results = await Promise.all(tasks);
-                state.latency = Math.round(performance.now() - t0);
-                if (el.latencyDisplay) el.latencyDisplay.textContent = `${state.latency} ms`;
-                countFPS();
-                results.forEach(({ preds, idx }) => processDetections(preds, idx));
+                } catch(e) { console.warn("Inference error:", e); }
+            }, 65); // ~15 fps
+        } else {
+            _inferenceTimer = setInterval(async () => {
+                if (!state.active || !state.model) return;
+                const idx    = _gridCamIndex;
+                const webcam = el.webcams[idx];
+                _gridCamIndex = (idx + 1) % 4;
+                if (!webcam || webcam.readyState < 2) return;
+                const t0 = performance.now();
+                try {
+                    _lastPreds[idx] = await state.model.detect(webcam);
+                    state.latency = Math.round(performance.now() - t0);
+                    if (el.latencyDisplay) el.latencyDisplay.textContent = `${state.latency} ms`;
+                } catch(e) { console.warn("Inference error:", e); }
+            }, 200); // one camera per 200 ms → ~5 fps per cam
+        }
+    }
+
+    function stopInferenceLoop() {
+        if (_inferenceTimer) { clearInterval(_inferenceTimer); _inferenceTimer = null; }
+    }
+
+    /* Render loop — runs at browser refresh rate (60fps) using cached predictions.
+       No GPU work here, just fast canvas drawing.                                */
+    function loop() {
+        if (!state.active) return;
+        countFPS();
+        if (state.layoutMode === "single") {
+            processDetections(_lastPreds[0] || [], 0);
+        } else {
+            for (let i = 0; i < 4; i++) {
+                processDetections(_lastPreds[i] || [], i);
             }
-        } catch(e) { console.error("Inference error:", e); }
+        }
         requestAnimationFrame(loop);
     }
 
@@ -2443,6 +2472,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 state.layoutMode = "single";
                 updateActiveChannelsDisplay();
                 syncCanvas();
+                if (state.active) startInferenceLoop(); // reset to 65ms single-cam timer
             });
 
             btnGrid.addEventListener("click", () => {
@@ -2456,6 +2486,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 state.layoutMode = "grid";
                 updateActiveChannelsDisplay();
                 syncCanvas();
+                _gridCamIndex = 0; // reset round-robin index
+                if (state.active) startInferenceLoop(); // reset to 200ms grid timer
             });
         }
 
