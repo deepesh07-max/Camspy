@@ -2271,3 +2271,79 @@ body {
     color: #475569;
     margin-right: 8px;
 }
+
+/* ==========================================================================
+   SURVEILLANCE OVERVIEW COMPONENT CUSTOM STYLES
+   ========================================================================== */
+.cm-severity-breakdown {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+}
+
+.severity-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.sev-lbl {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+}
+
+.sev-val {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.font-digit {
+    font-family: var(--font-digit);
+    letter-spacing: 2px;
+    text-shadow: 0 0 16px rgba(0, 255, 213, 0.3);
+}
+
+.cm-schedule-controls {
+    border-top: 1px solid var(--border-glass);
+    border-bottom: 1px solid var(--border-glass);
+    padding: 8px 0;
+}
+
+.cm-schedule-controls .flex-between {
+    align-items: center;
+}
+
+.cm-schedule-controls input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
+/* Filter Modal Content Adaptation */
+.filter-modal-content {
+    background: rgba(14, 17, 26, 0.95) !important;
+    border: 1px solid var(--border-hi) !important;
+    box-shadow: 0 0 40px rgba(0, 255, 213, 0.15) !important;
+    border-radius: var(--radius-lg);
+}
+
+.filter-search-wrap input:focus {
+    border-color: var(--border-hi) !important;
+    box-shadow: var(--cyan-glow);
+}
+
+/* Coordinate heatmap canvas styling */
+#overview-heatmap-canvas {
+    background-color: #07090e;
+    cursor: crosshair;
+}
+

@@ -75,107 +75,87 @@
 <!-- ===================== VIEW WRAPPERS ===================== -->
 <div id="main-content-wrapper">
 
-    <!-- ========== 1. OVERVIEW VIEW (CASHMATE STYLE) ========== -->
+    <!-- ========== 1. OVERVIEW VIEW (SURVEILLANCE THEMED) ========== -->
     <div id="view-overview" class="view-section active">
         <!-- Top Cashmate Metric Cards -->
         <section class="overview-metrics-row">
-            <!-- Metric 1: Total Spendings / Detections -->
+            <!-- Metric 1: Critical Detections -->
             <div class="cashmate-metric-card color-purple">
                 <div class="cm-card-header">
-                    <span class="cm-label">TOTAL SPENDINGS</span>
-                    <span class="cm-trend negative">-12%</span>
+                    <span class="cm-label">CRITICAL DETECTIONS</span>
+                    <span class="cm-trend positive" id="overview-trend-val">+0%</span>
                 </div>
-                <div class="cm-card-value">$832.88</div>
-                <div class="cm-mini-bar-chart">
-                    <!-- Vertical percentage metrics -->
-                    <div class="cm-bar-wrap" style="height: 35%;" title="Mon: 35%"><span class="day-lbl">35%</span></div>
-                    <div class="cm-bar-wrap" style="height: 12%;" title="Tue: 12%"><span class="day-lbl">12%</span></div>
-                    <div class="cm-bar-wrap" style="height: 28%;" title="Wed: 28%"><span class="day-lbl">28%</span></div>
-                    <div class="cm-bar-wrap" style="height: 9%;"  title="Thu: 9%"><span class="day-lbl">9%</span></div>
-                    <div class="cm-bar-wrap" style="height: 24%;" title="Fri: 24%"><span class="day-lbl">24%</span></div>
+                <div class="cm-card-value" id="overview-detections-val">0</div>
+                <div class="cm-severity-breakdown">
+                    <div class="severity-item"><span class="sev-lbl">HIGH</span><span class="sev-val text-red" id="sev-high-val">0</span></div>
+                    <div class="severity-item"><span class="sev-lbl">MED</span><span class="sev-val text-amber" id="sev-med-val">0</span></div>
+                    <div class="severity-item"><span class="sev-lbl">LOW</span><span class="sev-val text-green" id="sev-low-val">0</span></div>
                 </div>
-                <span class="cm-sub">THIS WEEK</span>
+                <span class="cm-sub">TOTAL EVENTS LOGGED</span>
             </div>
 
-            <!-- Metric 2: Savings / Alarm Detections -->
+            <!-- Metric 2: Session Uptime (Digital clock) -->
             <div class="cashmate-metric-card color-red">
                 <div class="cm-card-header">
-                    <span class="cm-label">SAVINGS</span>
-                    <span class="cm-trend negative">-2%</span>
+                    <span class="cm-label">SESSION UPTIME</span>
+                    <span class="cm-trend negative" id="uptime-trend-badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b;">STBY</span>
                 </div>
-                <div class="cm-card-value" id="overview-savings-val">$2,512.40</div>
-                <div class="cm-mini-chart-canvas-wrap">
-                    <canvas id="cm-savings-chart"></canvas>
+                <div class="cm-card-value font-digit text-cyan" id="overview-uptime-val" style="font-family: var(--font-digit); letter-spacing: 2px;">00:00:00</div>
+                <div class="cm-uptime-status" id="overview-uptime-status" style="font-size: 0.72rem; color: #64748b; font-weight: 600;">
+                    STATUS: SENSOR STANDBY
                 </div>
-                <span class="cm-sub">THIS YEAR</span>
+                <span class="cm-sub">ELAPSED CLOCK</span>
             </div>
 
-            <!-- Metric 3: Investments / System Reliability -->
+            <!-- Metric 3: Quiet Hours Alert Schedule -->
             <div class="cashmate-metric-card color-green">
                 <div class="cm-card-header">
-                    <span class="cm-label">INVESTMENTS</span>
-                    <span class="cm-trend positive">+4%</span>
+                    <span class="cm-label">QUIET HOURS SCHEDULE</span>
+                    <label class="switch-toggle mini-switch">
+                        <input type="checkbox" id="switch-quiet-hours">
+                        <span class="switch-slider"></span>
+                    </label>
                 </div>
-                <div class="cm-card-value">$1,215.25</div>
-                <div class="cm-mini-chart-canvas-wrap">
-                    <canvas id="cm-investments-chart"></canvas>
+                <div class="cm-schedule-controls" style="margin: 8px 0; display: flex; flex-direction: column; gap: 8px;">
+                    <div class="flex-between" style="gap: 8px;">
+                        <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">START TIME</span>
+                        <input type="time" id="input-quiet-start" value="09:00" class="custom-select" style="font-size: 0.8rem; padding: 4px 8px; width: 95px; border-radius: 4px; border: 1px solid var(--border-glass); background: var(--bg-input); color: #fff;">
+                    </div>
+                    <div class="flex-between" style="gap: 8px;">
+                        <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">END TIME</span>
+                        <input type="time" id="input-quiet-end" value="18:00" class="custom-select" style="font-size: 0.8rem; padding: 4px 8px; width: 95px; border-radius: 4px; border: 1px solid var(--border-glass); background: var(--bg-input); color: #fff;">
+                    </div>
                 </div>
-                <span class="cm-sub">THIS YEAR</span>
+                <span class="cm-sub" id="quiet-hours-status" style="color: #64748b;">SUPPRESSION SCHEDULE OFF</span>
             </div>
         </section>
 
         <!-- Main Cashmate Layout -->
         <section class="overview-grid">
-            <!-- Left Panel: Transactions / Recent Incidents -->
+            <!-- Left Panel: SYSTEM EVENT FEED -->
             <div class="cashmate-panel-card left-panel">
                 <div class="cm-panel-header">
-                    <span class="cm-panel-title">Transactions</span>
+                    <span class="cm-panel-title">System Event Feed</span>
                 </div>
                 <div class="cm-transactions-list" id="overview-transactions-list">
-                    <!-- Dynamically populated transaction alerts -->
-                    <div class="cm-transaction-item">
-                        <div class="cm-icon-circle bg-purple"><i class="fa-solid fa-user-secret"></i></div>
-                        <div class="cm-tx-details">
-                            <span class="cm-tx-name">Simon Pegg // Person</span>
-                            <span class="cm-tx-date">Today, 6:22 PM</span>
-                        </div>
-                        <span class="cm-tx-amount positive">+44.80</span>
-                    </div>
-                    <div class="cm-transaction-item">
-                        <div class="cm-icon-circle bg-yellow"><i class="fa-solid fa-music"></i></div>
-                        <div class="cm-tx-details">
-                            <span class="cm-tx-name">Apple Music // Laptop</span>
-                            <span class="cm-tx-date">Today, 12:30 PM</span>
-                        </div>
-                        <span class="cm-tx-amount negative">-9.99</span>
-                    </div>
-                    <div class="cm-transaction-item">
-                        <div class="cm-icon-circle bg-blue"><i class="fa-solid fa-store"></i></div>
-                        <div class="cm-tx-details">
-                            <span class="cm-tx-name">7-Eleven // Car</span>
-                            <span class="cm-tx-date">Yesterday</span>
-                        </div>
-                        <span class="cm-tx-amount negative">-5.18</span>
+                    <!-- Dynamically populated incident alerts -->
+                    <div class="empty-state" style="padding: 24px; text-align: center;">
+                        <i class="fa-solid fa-signature" style="font-size: 1.5rem; color: #475569; margin-bottom: 8px;"></i>
+                        <p style="font-size: 0.8rem; color: #64748b;">No recent alerts. Monitoring active...</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Panel: Total Spent Large Chart -->
+            <!-- Right Panel: DETECTION CLUSTER HEATMAP -->
             <div class="cashmate-panel-card right-panel">
                 <div class="cm-panel-header flex-between">
                     <div>
-                        <span class="cm-panel-title" id="cm-main-chart-title">$9,340.80 Spent</span>
-                    </div>
-                    <div class="cm-chart-selectors">
-                        <button class="cm-sel-btn">Day</button>
-                        <button class="cm-sel-btn">Week</button>
-                        <button class="cm-sel-btn">Month</button>
-                        <button class="cm-sel-btn active">Year</button>
+                        <span class="cm-panel-title">Detection Cluster Heatmap</span>
                     </div>
                 </div>
-                <!-- Large Bar Chart Canvas -->
-                <div class="cm-large-chart-container">
-                    <canvas id="cm-main-bar-chart"></canvas>
+                <!-- Heatmap Canvas -->
+                <div class="cm-large-chart-container" style="height: 380px; position: relative; width: 100%; border: 1px solid var(--border-glass); border-radius: var(--radius-md); background: rgba(0, 0, 0, 0.25); overflow: hidden;">
+                    <canvas id="overview-heatmap-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
                 </div>
             </div>
         </section>
@@ -475,34 +455,12 @@
                     <!-- Hidden ref for script compatibility -->
                     <button id="btn-deposit-siren" style="display:none"></button>
 
-                    <!-- TARGET LOGIC FILTERS (HIGH SCALE) -->
-                    <div class="control-col target-filters-section">
-                        <div class="flex-between align-center">
-                            <div class="target-title-wrap">
-                                <span class="ctrl-title">TARGET LOGIC FILTERS</span>
-                                <span class="filter-count-badge" id="filter-active-badge">-- ACTIVE</span>
-                            </div>
-                        </div>
-
-                        <!-- Instant Filter Search Input -->
-                        <div class="filter-search-wrap">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="filter-search" placeholder="Search 170+ classes instantly...">
-                        </div>
-
-                        <!-- Grouped / Scrollable Filter List -->
-                        <div class="scrollable-filter-container">
-                            <div id="filter-grid" class="dynamic-filter-grid">
-                                <!-- Populated by JavaScript -->
-                            </div>
-                        </div>
-
-                        <!-- Action Button Row -->
-                        <div class="filter-actions-row">
-                            <button id="btn-select-all" class="hud-pill-btn"><i class="fa-solid fa-check-double"></i> ALL</button>
-                            <button id="btn-select-none" class="hud-pill-btn"><i class="fa-solid fa-xmark"></i> CLEAR</button>
-                            <button id="btn-invert" class="hud-pill-btn btn-invert-amber"><i class="fa-solid fa-rotate"></i> INVERT</button>
-                        </div>
+                    <!-- TARGET DETECTOR FILTERS CONFIG -->
+                    <div class="control-col" style="margin-top: 16px;">
+                        <span class="ctrl-title mb-8 block">TARGET DETECTION FILTERS</span>
+                        <button id="btn-configure-filters" class="action-btn btn-glass-cyan" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i class="fa-solid fa-sliders"></i> CONFIGURE TARGETS (<span id="filter-count-label">--</span>)
+                        </button>
                     </div>
 
                 </div>
@@ -696,6 +654,49 @@
             <a href="#" class="action-btn btn-glass-cyan" id="modal-download" download="incident_clip.webm">
                 <i class="fa-solid fa-download"></i> DOWNLOAD WEBMS
             </a>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== GLASSMORPHIC TARGET FILTERS MODAL ===================== -->
+<div class="clip-modal hide" id="filter-modal">
+    <div class="clip-modal-content filter-modal-content" style="max-width: 800px; width: 90%;">
+        <!-- HUD decorative brackets -->
+        <div class="bracket tl"></div>
+        <div class="bracket tr"></div>
+        <div class="bracket bl"></div>
+        <div class="bracket br"></div>
+
+        <div class="clip-modal-header flex-between">
+            <div class="target-title-wrap" style="display: flex; align-items: center; gap: 12px;">
+                <span class="modal-title">// TARGET DETECTOR LOGIC FILTERS</span>
+                <span class="filter-count-badge" id="filter-active-badge" style="background: var(--cyan-dim); border: 1px solid var(--border-hi); color: var(--cyan); font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-family: var(--font-mono);">-- ACTIVE</span>
+            </div>
+            <button class="modal-close-btn" id="filter-modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="clip-modal-body">
+            <!-- Search input -->
+            <div class="filter-search-wrap" style="margin-bottom: 20px; position: relative;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 0.95rem;"></i>
+                <input type="text" id="filter-search" placeholder="Search 170+ classes instantly..." style="background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-glass); border-radius: var(--radius-sm); color: #fff; width: 100%; padding: 12px 16px 12px 42px; font-family: var(--font-sans); font-size: 0.85rem; outline: none; transition: var(--transition);">
+            </div>
+
+            <!-- Scrollable Checklist Grid -->
+            <div class="scrollable-filter-container" style="max-height: 400px; overflow-y: auto; padding-right: 4px;">
+                <div id="filter-grid" class="dynamic-filter-grid">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <div class="clip-modal-footer flex-between" style="border-top: 1px solid var(--border-glass); padding-top: 16px; margin-top: 16px;">
+            <span class="clip-info">Check/uncheck classes to toggle alarm triggers</span>
+            <div class="filter-actions-row" style="display: flex; gap: 8px;">
+                <button id="btn-select-all" class="hud-pill-btn"><i class="fa-solid fa-check-double"></i> ALL</button>
+                <button id="btn-select-none" class="hud-pill-btn"><i class="fa-solid fa-xmark"></i> CLEAR</button>
+                <button id="btn-invert" class="hud-pill-btn btn-invert-amber"><i class="fa-solid fa-rotate"></i> INVERT</button>
+            </div>
         </div>
     </div>
 </div>
