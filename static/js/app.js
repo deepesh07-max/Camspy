@@ -1178,32 +1178,47 @@ document.addEventListener("DOMContentLoaded", () => {
        CAMERA STREAM MANAGEMENT
      ------------------------------------------------------- */
     function isPhoneOrVirtualDevice(label) {
-        if (!label) return true; // Treat empty label as phone/virtual to prevent prompts
+        // Only filter devices that have a label AND the label matches phone/virtual tether keywords.
+        // Empty label = device before permission is granted — do NOT block it.
+        if (!label) return false;
         const lbl = label.toLowerCase();
-        // Check for common phone, virtual, connection link, or wireless/remote keywords
+        // Block known virtual camera / phone-tether apps only (not physical phone cameras)
         const keywords = [
-            "phone", "android", "galaxy", "iphone", "pixel", "huawei", "oneplus", "xiaomi", "redmi", "oppo", "vivo",
-            "continuity", "virtual", "link to windows", "phone link", "epoccam", "droidcam", "ivcam", "iriun", 
-            "obs", "unity", "manycam", "splitcam", "xsplit", "youcam", "cyberlink", "mobile", "connected", "wireless",
-            "remote", "bluetooth", "wifi", "wi-fi", "disconnected"
+            "continuity", "link to windows", "phone link", "epoccam", "droidcam",
+            "ivcam", "iriun", "obs", "manycam", "splitcam", "xsplit",
+            "youcam", "cyberlink", "virtual", "disconnected"
         ];
         return keywords.some(k => lbl.includes(k));
     }
 
     async function populateCamList() {
         try {
+            // Step 1: Request camera permission first so browsers unlock real deviceIds + labels.
+            // Without this, enumerateDevices() returns empty labels and blank deviceIds on new devices.
+            try {
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                tempStream.getTracks().forEach(t => t.stop()); // immediately release
+            } catch (permErr) {
+                console.warn("Camera permission denied or unavailable:", permErr);
+                if (el.selectCamera) {
+                    el.selectCamera.innerHTML = `<option>⚠ Camera permission denied</option>`;
+                }
+                return;
+            }
+
+            // Step 2: Now enumerate devices — labels and deviceIds are populated after permission
             const devs = await navigator.mediaDevices.enumerateDevices();
             const cams = devs.filter(d => d.kind === "videoinput");
             if (!el.selectCamera) return;
             el.selectCamera.innerHTML = "";
             if (!cams.length) {
-                el.selectCamera.innerHTML = `<option>No webcams found</option>`;
+                el.selectCamera.innerHTML = `<option>No cameras found</option>`;
                 return;
             }
             cams.forEach((c, i) => {
                 const o = document.createElement("option");
                 o.value       = c.deviceId;
-                o.textContent = c.label || `Surveillance Camera ${i+1}`;
+                o.textContent = c.label || `Camera ${i + 1}`;
                 if (c.deviceId === state.deviceId) o.selected = true;
                 el.selectCamera.appendChild(o);
             });
@@ -1211,20 +1226,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function pickBestCamera() {
+        // Ensure permission is granted first
         try {
-            const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+            const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
             tmp.getTracks().forEach(t => t.stop());
         } catch(_) {}
+
         const devs = await navigator.mediaDevices.enumerateDevices();
         const cams = devs.filter(d => d.kind === "videoinput");
-        let best = null;
-        for (const c of cams) {
-            if (c.label && !isPhoneOrVirtualDevice(c.label)) {
-                best = c;
-                break;
-            }
-        }
-        if (!best) best = cams[0];
+
+        // Prefer non-virtual cameras; fall back to any camera (important for mobile devices)
+        let best = cams.find(c => c.label && !isPhoneOrVirtualDevice(c.label));
+        if (!best) best = cams[0]; // fallback: use whatever is available (phone camera, etc.)
+
         if (best) state.deviceId = best.deviceId;
         await populateCamList();
     }
