@@ -1178,15 +1178,15 @@ document.addEventListener("DOMContentLoaded", () => {
        CAMERA STREAM MANAGEMENT
      ------------------------------------------------------- */
     function isPhoneOrVirtualDevice(label) {
-        // Only filter devices that have a label AND the label matches phone/virtual tether keywords.
-        // Empty label = device before permission is granted — do NOT block it.
+        // Only filter devices that have a label AND match known screen-share/fake-cam keywords.
+        // Do NOT block: DroidCam, iVCam, EpocCam, Iriun — these are real camera sharing apps.
+        // Do NOT block empty labels — those are real cameras before permission is granted.
         if (!label) return false;
         const lbl = label.toLowerCase();
-        // Block known virtual camera / phone-tether apps only (not physical phone cameras)
         const keywords = [
-            "continuity", "link to windows", "phone link", "epoccam", "droidcam",
-            "ivcam", "iriun", "obs", "manycam", "splitcam", "xsplit",
-            "youcam", "cyberlink", "virtual", "disconnected"
+            "obs", "manycam", "splitcam", "xsplit",
+            "youcam", "cyberlink", "virtual", "disconnected",
+            "link to windows", "phone link", "continuity camera"
         ];
         return keywords.some(k => lbl.includes(k));
     }
@@ -1197,11 +1197,19 @@ document.addEventListener("DOMContentLoaded", () => {
             // Without this, enumerateDevices() returns empty labels and blank deviceIds on new devices.
             try {
                 const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                tempStream.getTracks().forEach(t => t.stop()); // immediately release
+                tempStream.getTracks().forEach(t => t.stop());
             } catch (permErr) {
                 console.warn("Camera permission denied or unavailable:", permErr);
                 if (el.selectCamera) {
-                    el.selectCamera.innerHTML = `<option>⚠ Camera permission denied</option>`;
+                    const isDenied = permErr.name === "NotAllowedError";
+                    const isNotFound = permErr.name === "NotFoundError";
+                    if (isDenied) {
+                        el.selectCamera.innerHTML = `<option>⚠ Camera access blocked — allow in browser settings</option>`;
+                    } else if (isNotFound) {
+                        el.selectCamera.innerHTML = `<option>⚠ No camera found on this device</option>`;
+                    } else {
+                        el.selectCamera.innerHTML = `<option>⚠ Camera unavailable (${permErr.name})</option>`;
+                    }
                 }
                 return;
             }
